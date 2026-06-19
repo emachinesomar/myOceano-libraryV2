@@ -52,7 +52,7 @@
         </kbd>
       </button>
 
-      <div class="flex-1" />
+      <div class="flex-1"></div>
 
       <span class="text-xs text-muted-foreground font-medium tracking-wide uppercase">
         Ocean Library v2

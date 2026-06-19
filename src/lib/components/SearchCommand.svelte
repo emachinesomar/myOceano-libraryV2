@@ -78,7 +78,9 @@
   <div
     class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
     onclick={handleBackdropClick}
+    onkeydown={(e) => { if (e.key === 'Escape') handleBackdropClick(); }}
     role="presentation"
+    tabindex="-1"
   ></div>
 
   <!-- Command palette -->
@@ -88,6 +90,7 @@
       onclick={(e) => e.stopPropagation()}
       role="dialog"
       aria-label="Buscar documentos"
+      tabindex="-1"
     >
       <!-- Search input -->
       <div class="flex items-center gap-3 px-4 border-b border-border">

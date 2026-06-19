@@ -24,10 +24,12 @@ export interface IndexedDocument {
 export interface SearchResult {
   id: number;
   path: string;
-  filename: string;
+  title: string | null;
+  author: string | null;
+  religion: string | null;
+  book: string | null;
   snippet: string;
   rank: number;
-  metadata: DocumentMetadata;
 }
 
 /** Tree node for sidebar navigation */

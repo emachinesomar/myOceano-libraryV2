@@ -24,14 +24,6 @@ pub struct ParsedDocument {
     pub body: String,
 }
 
-/// Parse a Markdown file: extract YAML frontmatter and body.
-pub fn parse_markdown_file(path: &Path) -> Result<ParsedDocument, String> {
-    let content = std::fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
-
-    parse_markdown_content(&content)
-}
-
 /// Parse Markdown content string: separate frontmatter from body.
 pub fn parse_markdown_content(content: &str) -> Result<ParsedDocument, String> {
     let matter = Matter::<YAML>::new();
