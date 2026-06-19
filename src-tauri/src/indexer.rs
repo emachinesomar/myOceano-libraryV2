@@ -1,9 +1,15 @@
 use crate::db::Database;
-use crate::parser::{infer_metadata_from_path, merge_metadata, parse_markdown_file};
+use crate::parser::{infer_metadata_from_path, merge_metadata, parse_markdown_content};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
 use walkdir::WalkDir;
+
+/// Extract text from a PDF file using pdf-extract.
+fn extract_pdf_text(path: &Path) -> Result<String, String> {
+    pdf_extract::extract_text(path)
+        .map_err(|e| format!("PDF extraction failed: {}", e))
+}
 
 /// Result of scanning a directory for Markdown files.
 pub struct ScanResult {
@@ -34,7 +40,7 @@ pub fn scan_directory(root: &Path) -> ScanResult {
 
         if entry.file_type().is_file() {
             let ext = entry.path().extension().and_then(|e| e.to_str());
-            if ext == Some("md") || ext == Some("markdown") || ext == Some("txt") {
+            if ext == Some("md") || ext == Some("markdown") || ext == Some("txt") || ext == Some("pdf") {
                 files.push(entry.path().to_path_buf());
             }
         }
@@ -93,18 +99,36 @@ pub fn index_files(
             continue;
         }
 
-        // Parse the Markdown file
-        let parsed = match parse_markdown_file(path) {
-            Ok(p) => p,
-            Err(e) => {
-                errors.push(format!("Parse error {}: {}", path.display(), e));
-                continue;
+        // Parse the file based on extension
+        let ext_lower = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+        let (body, metadata) = if ext_lower == "pdf" {
+            // PDF: extract text, infer metadata from path
+            match extract_pdf_text(path) {
+                Ok(text) => {
+                    let inferred = infer_metadata_from_path(path);
+                    (text, inferred)
+                }
+                Err(e) => {
+                    errors.push(format!("PDF extract error {}: {}", path.display(), e));
+                    continue;
+                }
+            }
+        } else {
+            // Markdown/TXT: parse frontmatter
+            match std::fs::read_to_string(path).and_then(|content| {
+                parse_markdown_content(&content).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+            }) {
+                Ok(parsed) => {
+                    let inferred = infer_metadata_from_path(path);
+                    let metadata = merge_metadata(parsed.metadata, inferred);
+                    (parsed.body, metadata)
+                }
+                Err(e) => {
+                    errors.push(format!("Parse error {}: {}", path.display(), e));
+                    continue;
+                }
             }
         };
-
-        // Merge frontmatter metadata with path-inferred metadata
-        let inferred = infer_metadata_from_path(path);
-        let metadata = merge_metadata(parsed.metadata, inferred);
 
         // Insert into database
         let ext = path
@@ -136,7 +160,7 @@ pub fn index_files(
                     metadata.author.as_deref(),
                     metadata.religion.as_deref(),
                     metadata.book.as_deref(),
-                    &parsed.body,
+                    &body,
                 ) {
                     errors.push(format!("FTS error {}: {}", path.display(), e));
                 }
