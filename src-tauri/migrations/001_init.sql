@@ -30,8 +30,7 @@ CREATE TABLE IF NOT EXISTS document_metadata (
 -- FTS5 virtual table for full-text search
 -- unicode61 tokenizer with:
 --   remove_diacritics=2 — removes diacritics for languages that use them (á→a, é→e)
---   tokenchars — characters that are part of tokens (dots, hyphens, apostrophes)
---   separators — characters that separate tokens (spaces, punctuation)
+--   Handles Arabic, Sanskrit, Hebrew, CJK natively
 CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
     path,
     title,
@@ -41,7 +40,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
     body,
     content='documents_content',
     content_rowid='rowid',
-    tokenize='unicode61 remove_diacritics 2 tokenchars "-." apostrophes "\'"'
+    tokenize='unicode61 remove_diacritics 2'
 );
 
 -- External content table (actual storage)

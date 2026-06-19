@@ -26,15 +26,25 @@
   }
 
   async function handleIndexFolder() {
-    // Use Tauri dialog to pick a folder
-    const { open: openDialog } = await import('@tauri-apps/plugin-dialog');
-    const selected = await openDialog({ directory: true, multiple: false });
-    if (!selected) return;
-
-    const path = typeof selected === 'string' ? selected : selected as string;
-    indexing = true;
-
     try {
+      // Use Tauri dialog to pick a folder
+      const { open: openDialog } = await import('@tauri-apps/plugin-dialog');
+      const selected = await openDialog({ directory: true, multiple: false });
+      if (!selected) return;
+
+      // Handle different return types from dialog
+      let path: string;
+      if (typeof selected === 'string') {
+        path = selected;
+      } else if (Array.isArray(selected)) {
+        path = selected[0];
+      } else {
+        path = String(selected);
+      }
+
+      console.log('Indexing folder:', path);
+      indexing = true;
+
       // Listen for progress events
       const { listen } = await import('@tauri-apps/api/event');
       const unlisten = await listen<{ current: number; total: number; filename: string }>(

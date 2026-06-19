@@ -18,6 +18,8 @@ src-tauri/Frameworks/
 *.swp
 *.swo
 
+samples/
+
 # OS
 .DS_Store
 Thumbs.db

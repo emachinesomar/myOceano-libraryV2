@@ -12,6 +12,7 @@
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "Ocean Library",
         "width": 1280,
         "height": 800,
@@ -26,13 +27,5 @@
       "csp": null
     }
   },
-  "plugins": {
-    "dialog": {},
-    "fs": {
-      "scope": {
-        "allow": ["**"],
-        "deny": []
-      }
-    }
-  }
+  "plugins": {}
 }
