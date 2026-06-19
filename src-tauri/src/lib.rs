@@ -85,6 +85,7 @@ async fn search_documents(
                 religion: r.religion,
                 book: r.book,
                 snippet: r.snippet,
+                paragraph: r.paragraph,
                 rank: r.rank,
             })
             .collect(),
@@ -186,6 +187,7 @@ struct SearchResultJson {
     religion: Option<String>,
     book: Option<String>,
     snippet: String,
+    paragraph: String,
     rank: f64,
 }
 

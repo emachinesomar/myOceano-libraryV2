@@ -115,38 +115,9 @@ impl Database {
         let safe_query = sanitize_fts_query(query);
         let like_pattern = format!("%{}%", query);
 
-        let sql = format!(
-            "
-            SELECT
-                result.rowid,
-                result.path,
-                result.title,
-                result.author,
-                result.religion,
-                result.book,
-                result.body,
-                result.snippet,
-                result.rank
-            FROM (
-                -- FTS5 content matches (body + title + author + religion + book)
-                SELECT
-                    dc.rowid,
-                    dc.path,
-                    dc.title,
-                    dc.author,
-                    dc.religion,
-                    dc.book,
-                    dc.body,
-                    snippet(documents_fts, 5, '<mark>', '</mark>', '...', 64) as snippet,
-                    rank,
-                    0 as sort_priority
-                FROM documents_fts
-                JOIN documents_content dc ON dc.rowid = documents_fts.rowid
-                WHERE documents_fts MATCH ?1
-
-                UNION
-
-                -- Path/filename matches (not already in FTS results)
+        let results: Vec<SearchRow> = if safe_query.is_empty() {
+            // Only path LIKE search (FTS MATCH would fail on empty query)
+            let sql = "
                 SELECT
                     dc.rowid,
                     dc.path,
@@ -156,43 +127,110 @@ impl Database {
                     dc.book,
                     dc.body,
                     '<mark>' || dc.path || '</mark>' as snippet,
-                    0.0 as rank,
-                    1 as sort_priority
+                    0.0 as rank
                 FROM documents_content dc
-                WHERE dc.path LIKE ?2
-                AND dc.rowid NOT IN (
-                    SELECT documents_fts.rowid
+                WHERE dc.path LIKE ?1
+                ORDER BY dc.rowid
+                LIMIT ?2
+            ";
+            let mut stmt = conn.prepare(sql)?;
+            let rows = stmt
+                .query_map(rusqlite::params![like_pattern, limit], |row| {
+                    let body: String = row.get(6)?;
+                    let snippet: String = row.get(7)?;
+                    let paragraph = extract_paragraph(&body, &snippet);
+                    Ok(SearchRow {
+                        rowid: row.get(0)?,
+                        path: row.get(1)?,
+                        title: row.get(2)?,
+                        author: row.get(3)?,
+                        religion: row.get(4)?,
+                        book: row.get(5)?,
+                        snippet,
+                        paragraph,
+                        rank: row.get(8)?,
+                    })
+                })?
+                .collect::<SqlResult<Vec<_>>>()?;
+            rows
+        } else {
+            // FTS5 content matches + path LIKE matches (deduplicated)
+            let sql = "
+                SELECT
+                    result.rowid,
+                    result.path,
+                    result.title,
+                    result.author,
+                    result.religion,
+                    result.book,
+                    result.body,
+                    result.snippet,
+                    result.rank
+                FROM (
+                    -- FTS5 content matches (body + title + author + religion + book)
+                    SELECT
+                        dc.rowid,
+                        dc.path,
+                        dc.title,
+                        dc.author,
+                        dc.religion,
+                        dc.book,
+                        dc.body,
+                        snippet(documents_fts, 5, '<mark>', '</mark>', '...', 64) as snippet,
+                        rank,
+                        0 as sort_priority
                     FROM documents_fts
+                    JOIN documents_content dc ON dc.rowid = documents_fts.rowid
                     WHERE documents_fts MATCH ?1
-                )
-            ) result
-            ORDER BY sort_priority, rank
-            LIMIT ?3
-            "
-        );
 
-        let mut stmt = conn.prepare(&sql)?;
-        let rows = stmt
-            .query_map(rusqlite::params![safe_query, like_pattern, limit], |row| {
-                let body: String = row.get(6)?;
-                let snippet: String = row.get(7)?;
-                let paragraph = extract_paragraph(&body, &snippet);
+                    UNION
 
-                Ok(SearchRow {
-                    rowid: row.get(0)?,
-                    path: row.get(1)?,
-                    title: row.get(2)?,
-                    author: row.get(3)?,
-                    religion: row.get(4)?,
-                    book: row.get(5)?,
-                    snippet,
-                    paragraph,
-                    rank: row.get(8)?,
-                })
-            })?
-            .collect::<SqlResult<Vec<_>>>()?;
+                    -- Path/filename matches (not already in FTS results)
+                    SELECT
+                        dc.rowid,
+                        dc.path,
+                        dc.title,
+                        dc.author,
+                        dc.religion,
+                        dc.book,
+                        dc.body,
+                        '<mark>' || dc.path || '</mark>' as snippet,
+                        0.0 as rank,
+                        1 as sort_priority
+                    FROM documents_content dc
+                    WHERE dc.path LIKE ?2
+                    AND dc.rowid NOT IN (
+                        SELECT documents_fts.rowid
+                        FROM documents_fts
+                        WHERE documents_fts MATCH ?1
+                    )
+                ) result
+                ORDER BY sort_priority, rank
+                LIMIT ?3
+            ";
+            let mut stmt = conn.prepare(sql)?;
+            let rows = stmt
+                .query_map(rusqlite::params![safe_query, like_pattern, limit], |row| {
+                    let body: String = row.get(6)?;
+                    let snippet: String = row.get(7)?;
+                    let paragraph = extract_paragraph(&body, &snippet);
+                    Ok(SearchRow {
+                        rowid: row.get(0)?,
+                        path: row.get(1)?,
+                        title: row.get(2)?,
+                        author: row.get(3)?,
+                        religion: row.get(4)?,
+                        book: row.get(5)?,
+                        snippet,
+                        paragraph,
+                        rank: row.get(8)?,
+                    })
+                })?
+                .collect::<SqlResult<Vec<_>>>()?;
+            rows
+        };
 
-        Ok(rows)
+        Ok(results)
     }
 
     /// Get the hierarchical tree of documents grouped by religion > book > chapter.
