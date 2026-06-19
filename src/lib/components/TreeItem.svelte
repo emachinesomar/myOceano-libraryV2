@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { TreeNode } from '$lib/types';
+  import { selectedDocument } from '$lib/stores/document';
 
   let { node }: { node: TreeNode } = $props();
   let expanded = $state(false);
@@ -10,9 +11,8 @@
     }
   }
 
-  // Dispatch a custom event when a document is selected
   function selectDocument(path: string) {
-    window.dispatchEvent(new CustomEvent('select-document', { detail: { path } }));
+    selectedDocument.select(path);
   }
 </script>
 

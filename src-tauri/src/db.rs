@@ -96,7 +96,7 @@ impl Database {
 
         // Insert into FTS5 virtual table
         conn.execute(
-            "INSERT INTO documents_fts (rowid, path, title, author, religion, book, body) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT INTO documents_fts (rowid, path, title, author, religion, book, body) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
             rusqlite::params![rowid, path, title, author, religion, book, body],
         )?;
 
@@ -282,4 +282,131 @@ fn sanitize_fts_query(query: &str) -> String {
     }
 
     result.join(" ")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sanitize_simple_query() {
+        assert_eq!(sanitize_fts_query("bolivia"), "\"bolivia\"");
+    }
+
+    #[test]
+    fn test_sanitize_multiple_terms() {
+        assert_eq!(sanitize_fts_query("mensaje ridvan"), "\"mensaje\" \"ridvan\"");
+    }
+
+    #[test]
+    fn test_sanitize_boolean_operators() {
+        assert_eq!(
+            sanitize_fts_query("faith NOT doubt"),
+            "\"faith\" NOT \"doubt\""
+        );
+    }
+
+    #[test]
+    fn test_sanitize_or_operator() {
+        assert_eq!(
+            sanitize_fts_query("prayer OR meditation"),
+            "\"prayer\" OR \"meditation\""
+        );
+    }
+
+    #[test]
+    fn test_sanitize_strips_quotes() {
+        assert_eq!(sanitize_fts_query("\"bolivia\""), "\"bolivia\"");
+    }
+
+    #[test]
+    fn test_sanitize_empty_query() {
+        assert_eq!(sanitize_fts_query(""), "");
+        assert_eq!(sanitize_fts_query("   "), "");
+    }
+
+    #[test]
+    fn test_sanitize_special_characters() {
+        // FTS5 special chars should be wrapped in quotes
+        assert_eq!(sanitize_fts_query("test-*"), "\"test-*\"");
+    }
+
+    #[test]
+    fn test_database_insert_and_search() {
+        let dir = std::env::temp_dir().join("ocean_test_db");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let db_path = dir.join("test.db");
+        let db = Database::open(&db_path).unwrap();
+        db.initialize_schema().unwrap();
+
+        // Insert a file
+        let file_id = db
+            .insert_file(
+                "/test/sample.pdf",
+                "sample.pdf",
+                "pdf",
+                1024,
+                "2026-01-01T00:00:00Z",
+            )
+            .unwrap();
+
+        // Insert metadata
+        db.insert_metadata(
+            file_id,
+            Some("Bahaismo"),
+            Some("Ridván"),
+            Some("2026"),
+            None,
+            Some("Mensaje de Ridván"),
+            None,
+            Some("Castellano"),
+            None,
+        )
+        .unwrap();
+
+        // Insert FTS content
+        db.insert_fts(
+            "/test/sample.pdf",
+            Some("Mensaje de Ridván"),
+            None,
+            Some("Bahaismo"),
+            Some("Ridván"),
+            "Este es un mensaje sobre la fe y la comunidad en Bolivia.",
+        )
+        .unwrap();
+
+        // Search
+        let results = db.search("bolivia", 10).unwrap();
+        assert_eq!(results.len(), 1);
+        assert!(results[0].snippet.contains("Bolivia"));
+
+        // Search with no results
+        let results = db.search("noexiste", 10).unwrap();
+        assert_eq!(results.len(), 0);
+
+        // Read document
+        let body = db.read_document("/test/sample.pdf").unwrap();
+        assert!(body.is_some());
+        assert!(body.unwrap().contains("Bolivia"));
+
+        // Get tree
+        let tree = db.get_document_tree().unwrap();
+        assert_eq!(tree.len(), 1);
+        assert_eq!(tree[0].religion, "Bahaismo");
+        assert_eq!(tree[0].book, "Ridván");
+
+        // Stats
+        let (total, _) = db.get_stats().unwrap();
+        assert_eq!(total, 1);
+
+        // Clear
+        db.clear_all().unwrap();
+        let (total, _) = db.get_stats().unwrap();
+        assert_eq!(total, 0);
+
+        // Cleanup
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

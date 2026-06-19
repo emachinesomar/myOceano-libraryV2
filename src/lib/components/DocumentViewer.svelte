@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { readDocument } from '$lib/tauri';
   import { marked } from 'marked';
+  import { selectedDocument } from '$lib/stores/document';
 
   let documentPath = $state<string | null>(null);
   let content = $state('');
@@ -10,30 +11,29 @@
   let searchSnippet = $state('');
   let scrollEl = $state<HTMLDivElement>();
 
-  // Scroll to top when document changes
-  $effect(() => {
-    if (content && scrollEl) {
-      scrollEl.scrollTop = 0;
-    }
-  });
-
   // Configure marked for safe rendering
   marked.setOptions({
     breaks: true,
     gfm: true,
   });
 
-  // Listen for document selection events
+  // Subscribe to selected document store
   onMount(() => {
-    function handleSelect(e: Event) {
-      const detail = (e as CustomEvent).detail;
-      documentPath = detail.path;
-      searchSnippet = detail.snippet || '';
-      loadDocument(detail.path);
-    }
+    const unsubscribe = selectedDocument.subscribe((doc) => {
+      if (doc) {
+        documentPath = doc.path;
+        searchSnippet = doc.snippet || '';
+        loadDocument(doc.path);
+      }
+    });
+    return unsubscribe;
+  });
 
-    window.addEventListener('select-document', handleSelect);
-    return () => window.removeEventListener('select-document', handleSelect);
+  // Scroll to top when document changes
+  $effect(() => {
+    if (content && scrollEl) {
+      scrollEl.scrollTop = 0;
+    }
   });
 
   async function loadDocument(path: string) {

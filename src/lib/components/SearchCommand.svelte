@@ -3,6 +3,7 @@
   import type { SearchResult } from '$lib/types';
   import { searchDocuments } from '$lib/tauri';
   import { toasts } from '$lib/stores/toast';
+  import { selectedDocument } from '$lib/stores/document';
 
   let { open = $bindable(false) }: { open: boolean } = $props();
 
@@ -62,11 +63,7 @@
   }
 
   function selectResult(result: SearchResult) {
-    window.dispatchEvent(
-      new CustomEvent('select-document', {
-        detail: { path: result.path, snippet: result.snippet }
-      })
-    );
+    selectedDocument.select(result.path, result.snippet);
     open = false;
   }
 
