@@ -12,6 +12,7 @@
   let loading = $state(false);
   let selectedIndex = $state(0);
   let inputEl = $state<HTMLInputElement>();
+  let hasSearched = $state(false);
 
   // Focus input when opened
   $effect(() => {
@@ -19,46 +20,47 @@
       query = '';
       results = [];
       selectedIndex = 0;
+      hasSearched = false;
       tick().then(() => inputEl?.focus());
     }
   });
 
-  // Debounced search
-  let searchTimeout: ReturnType<typeof setTimeout>;
-  $effect(() => {
+  async function handleSearch() {
     const q = query.trim();
-    clearTimeout(searchTimeout);
-    if (q.length < 2) {
+    if (q.length < 2) return;
+
+    loading = true;
+    hasSearched = true;
+    try {
+      const response = await searchDocuments(q);
+      results = response.results;
+      selectedIndex = 0;
+    } catch (e) {
+      console.error('Search failed:', e);
+      toasts.error('Error en la búsqueda');
       results = [];
-      return;
     }
-    searchTimeout = setTimeout(async () => {
-      loading = true;
-      try {
-        const response = await searchDocuments(q);
-        results = response.results;
-        selectedIndex = 0;
-      } catch (e) {
-        console.error('Search failed:', e);
-        toasts.error('Error en la búsqueda');
-        results = [];
-      }
-      loading = false;
-    }, 200);
-  });
+    loading = false;
+  }
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === 'Escape') {
       open = false;
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      // If results are shown and one is selected, open it
+      if (results.length > 0 && selectedIndex >= 0) {
+        selectResult(results[selectedIndex]);
+      } else {
+        // Otherwise trigger search
+        handleSearch();
+      }
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
       selectedIndex = Math.min(selectedIndex + 1, results.length - 1);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       selectedIndex = Math.max(selectedIndex - 1, 0);
-    } else if (e.key === 'Enter' && results.length > 0) {
-      e.preventDefault();
-      selectResult(results[selectedIndex]);
     }
   }
 
@@ -93,10 +95,7 @@
       tabindex="0"
     >
       <!-- Search input -->
-      <div class="flex items-center gap-3 px-4 border-b border-border">
-        <svg class="h-4 w-4 shrink-0 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
+      <div class="flex items-center gap-2 px-4 border-b border-border">
         <input
           bind:this={inputEl}
           bind:value={query}
@@ -106,10 +105,21 @@
           class="flex-1 bg-transparent py-3 text-sm text-foreground placeholder-muted-foreground focus:outline-none"
         />
         {#if loading}
-          <svg class="h-4 w-4 animate-spin text-muted-foreground" fill="none" viewBox="0 0 24 24">
+          <svg class="h-4 w-4 animate-spin text-muted-foreground shrink-0" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
+        {:else}
+          <button
+            onclick={handleSearch}
+            disabled={query.trim().length < 2}
+            class="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
+            aria-label="Buscar"
+          >
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </button>
         {/if}
       </div>
 
@@ -144,7 +154,7 @@
             </button>
           {/each}
         </div>
-      {:else if query.trim().length >= 2 && !loading}
+      {:else if hasSearched && !loading}
         <div class="py-8 text-center">
           <p class="text-sm text-muted-foreground">Sin resultados para "{query}"</p>
         </div>
@@ -154,7 +164,7 @@
       <div class="flex items-center justify-between px-4 py-2 border-t border-border bg-muted/30">
         <div class="flex items-center gap-3 text-[10px] text-muted-foreground">
           <span><kbd class="px-1 py-0.5 bg-background border border-border rounded text-[9px]">↑↓</kbd> navegar</span>
-          <span><kbd class="px-1 py-0.5 bg-background border border-border rounded text-[9px]">↵</kbd> abrir</span>
+          <span><kbd class="px-1 py-0.5 bg-background border border-border rounded text-[9px]">↵</kbd> buscar/abrir</span>
           <span><kbd class="px-1 py-0.5 bg-background border border-border rounded text-[9px]">esc</kbd> cerrar</span>
         </div>
         {#if results.length > 0}

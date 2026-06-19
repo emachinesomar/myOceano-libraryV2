@@ -103,7 +103,7 @@ impl Database {
         Ok(())
     }
 
-    /// Search FTS5 with a query string. Returns results with snippets and paragraphs.
+    /// Search FTS5 content AND file paths with a query string.
     pub fn search(
         &self,
         query: &str,
@@ -113,30 +113,67 @@ impl Database {
 
         // Sanitize query for FTS5: wrap each term in quotes for safety
         let safe_query = sanitize_fts_query(query);
+        let like_pattern = format!("%{}%", query);
 
         let sql = format!(
             "
             SELECT
-                dc.rowid,
-                dc.path,
-                dc.title,
-                dc.author,
-                dc.religion,
-                dc.book,
-                dc.body,
-                snippet(documents_fts, 5, '<mark>', '</mark>', '...', 64) as snippet,
-                rank
-            FROM documents_fts
-            JOIN documents_content dc ON dc.rowid = documents_fts.rowid
-            WHERE documents_fts MATCH ?1
-            ORDER BY rank
-            LIMIT ?2
+                result.rowid,
+                result.path,
+                result.title,
+                result.author,
+                result.religion,
+                result.book,
+                result.body,
+                result.snippet,
+                result.rank
+            FROM (
+                -- FTS5 content matches (body + title + author + religion + book)
+                SELECT
+                    dc.rowid,
+                    dc.path,
+                    dc.title,
+                    dc.author,
+                    dc.religion,
+                    dc.book,
+                    dc.body,
+                    snippet(documents_fts, 5, '<mark>', '</mark>', '...', 64) as snippet,
+                    rank,
+                    0 as sort_priority
+                FROM documents_fts
+                JOIN documents_content dc ON dc.rowid = documents_fts.rowid
+                WHERE documents_fts MATCH ?1
+
+                UNION
+
+                -- Path/filename matches (not already in FTS results)
+                SELECT
+                    dc.rowid,
+                    dc.path,
+                    dc.title,
+                    dc.author,
+                    dc.religion,
+                    dc.book,
+                    dc.body,
+                    '<mark>' || dc.path || '</mark>' as snippet,
+                    0.0 as rank,
+                    1 as sort_priority
+                FROM documents_content dc
+                WHERE dc.path LIKE ?2
+                AND dc.rowid NOT IN (
+                    SELECT documents_fts.rowid
+                    FROM documents_fts
+                    WHERE documents_fts MATCH ?1
+                )
+            ) result
+            ORDER BY sort_priority, rank
+            LIMIT ?3
             "
         );
 
         let mut stmt = conn.prepare(&sql)?;
         let rows = stmt
-            .query_map(rusqlite::params![safe_query, limit], |row| {
+            .query_map(rusqlite::params![safe_query, like_pattern, limit], |row| {
                 let body: String = row.get(6)?;
                 let snippet: String = row.get(7)?;
                 let paragraph = extract_paragraph(&body, &snippet);
