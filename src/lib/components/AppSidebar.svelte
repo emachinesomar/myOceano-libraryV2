@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import type { TreeNode } from '$lib/types';
-  import { getDocumentTree, indexDirectory, clearIndex } from '$lib/tauri';
+  import { getDocumentTree, indexDirectory, clearIndex, getFtsStats } from '$lib/tauri';
   import { toasts } from '$lib/stores/toast';
   import DocumentTree from './DocumentTree.svelte';
 
@@ -11,9 +11,11 @@
   let loading = $state(false);
   let indexing = $state(false);
   let indexProgress = $state({ current: 0, total: 0, filename: '' });
+  let ftsStats = $state<{ files_count: number; content_count: number; fts_count: number } | null>(null);
 
   onMount(async () => {
     await loadTree();
+    await loadFtsStats();
   });
 
   async function loadTree() {
@@ -25,6 +27,14 @@
       toasts.error('Error al cargar el árbol de documentos');
     }
     loading = false;
+  }
+
+  async function loadFtsStats() {
+    try {
+      ftsStats = await getFtsStats();
+    } catch (e) {
+      console.error('Failed to load FTS stats:', e);
+    }
   }
 
   async function handleIndexFolder() {
@@ -66,6 +76,7 @@
       }
       console.log(`Indexed ${result.indexed} files in ${result.duration_ms}ms`);
       await loadTree();
+      await loadFtsStats();
     } catch (e) {
       console.error('Indexing failed:', e);
       toasts.error(`Error al indexar: ${String(e)}`);
@@ -75,7 +86,6 @@
   }
 
   async function handleClearIndex() {
-    if (!confirm('¿Limpiar el índice? Se perderán todos los documentos indexados.')) return;
     try {
       await clearIndex();
       tree = [];
@@ -165,6 +175,11 @@
       <p class="text-[10px] text-muted-foreground/50 text-center">
         {tree.reduce((acc, r) => acc + r.count, 0)} libros · {tree.length} religiones
       </p>
+      {#if ftsStats}
+        <p class="text-[9px] text-muted-foreground/30 text-center mt-1">
+          files:{ftsStats.files_count} content:{ftsStats.content_count} fts:{ftsStats.fts_count}
+        </p>
+      {/if}
     </div>
   {/if}
 </aside>

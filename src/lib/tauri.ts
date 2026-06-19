@@ -43,3 +43,10 @@ export async function clearIndex(): Promise<void> {
 export async function getIndexStats(): Promise<{ total: number; last_indexed: string | null }> {
   return invoke<{ total: number; last_indexed: string | null }>('get_index_stats');
 }
+
+/**
+ * Get FTS debug statistics.
+ */
+export async function getFtsStats(): Promise<{ files_count: number; content_count: number; fts_count: number }> {
+  return invoke<{ files_count: number; content_count: number; fts_count: number }>('get_fts_stats');
+}

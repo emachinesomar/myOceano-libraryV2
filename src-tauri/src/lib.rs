@@ -144,6 +144,14 @@ async fn get_index_stats(app: tauri::AppHandle) -> Result<IndexStats, String> {
     })
 }
 
+/// Debug: get FTS statistics to verify population.
+#[tauri::command]
+async fn get_fts_stats(app: tauri::AppHandle) -> Result<db::FtsStats, String> {
+    let state = app.state::<Arc<AppState>>();
+    let db = &state.db;
+    db.get_fts_stats().map_err(|e| format!("FTS stats failed: {}", e))
+}
+
 // ──────────────────────────── Types ────────────────────────────
 
 #[derive(Clone, serde::Serialize)]
@@ -289,6 +297,7 @@ pub fn run() {
             read_document,
             clear_index,
             get_index_stats,
+            get_fts_stats,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

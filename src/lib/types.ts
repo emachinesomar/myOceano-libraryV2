@@ -29,6 +29,7 @@ export interface SearchResult {
   religion: string | null;
   book: string | null;
   snippet: string;
+  paragraph: string;
   rank: number;
 }
 

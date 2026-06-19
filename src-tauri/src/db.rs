@@ -103,7 +103,7 @@ impl Database {
         Ok(())
     }
 
-    /// Search FTS5 with a query string. Returns results with snippets.
+    /// Search FTS5 with a query string. Returns results with snippets and paragraphs.
     pub fn search(
         &self,
         query: &str,
@@ -123,7 +123,8 @@ impl Database {
                 dc.author,
                 dc.religion,
                 dc.book,
-                snippet(documents_fts, 5, '<mark>', '</mark>', '...', 48) as snippet,
+                dc.body,
+                snippet(documents_fts, 5, '<mark>', '</mark>', '...', 64) as snippet,
                 rank
             FROM documents_fts
             JOIN documents_content dc ON dc.rowid = documents_fts.rowid
@@ -136,6 +137,10 @@ impl Database {
         let mut stmt = conn.prepare(&sql)?;
         let rows = stmt
             .query_map(rusqlite::params![safe_query, limit], |row| {
+                let body: String = row.get(6)?;
+                let snippet: String = row.get(7)?;
+                let paragraph = extract_paragraph(&body, &snippet);
+
                 Ok(SearchRow {
                     rowid: row.get(0)?,
                     path: row.get(1)?,
@@ -143,8 +148,9 @@ impl Database {
                     author: row.get(3)?,
                     religion: row.get(4)?,
                     book: row.get(5)?,
-                    snippet: row.get(6)?,
-                    rank: row.get(7)?,
+                    snippet,
+                    paragraph,
+                    rank: row.get(8)?,
                 })
             })?
             .collect::<SqlResult<Vec<_>>>()?;
@@ -226,6 +232,15 @@ impl Database {
             .ok();
         Ok((total, last))
     }
+
+    /// Get FTS debug statistics.
+    pub fn get_fts_stats(&self) -> SqlResult<FtsStats> {
+        let conn = self.conn.lock().unwrap();
+        let files_count: i64 = conn.query_row("SELECT COUNT(*) FROM files", [], |row| row.get(0))?;
+        let content_count: i64 = conn.query_row("SELECT COUNT(*) FROM documents_content", [], |row| row.get(0))?;
+        let fts_count: i64 = conn.query_row("SELECT COUNT(*) FROM documents_fts", [], |row| row.get(0))?;
+        Ok(FtsStats { files_count, content_count, fts_count })
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -237,6 +252,7 @@ pub struct SearchRow {
     pub religion: Option<String>,
     pub book: Option<String>,
     pub snippet: String,
+    pub paragraph: String,
     pub rank: f64,
 }
 
@@ -247,6 +263,68 @@ pub struct TreeEntry {
     pub chapter: String,
     pub path: String,
     pub filename: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct FtsStats {
+    pub files_count: i64,
+    pub content_count: i64,
+    pub fts_count: i64,
+}
+
+/// Extract the paragraph containing the search match from the full body.
+/// Uses the snippet's first plain-text word sequence to locate the paragraph.
+fn extract_paragraph(body: &str, snippet: &str) -> String {
+    // Strip HTML tags from snippet to get plain text for matching
+    let plain_snippet = strip_tags(snippet);
+
+    // Find the first meaningful word sequence in the snippet (skip short/common words)
+    let keywords: Vec<&str> = plain_snippet
+        .split_whitespace()
+        .filter(|w| w.len() > 3 && !["para", "como", "pero", "como", "desde", "hasta", "sobre", "entre", "otro", "esta", "este", "todo", "más", "pero"].contains(&w.to_lowercase().as_str()))
+        .take(3)
+        .collect();
+
+    if keywords.is_empty() {
+        // Fallback: return first paragraph
+        return body
+            .split("\n\n")
+            .next()
+            .unwrap_or(body)
+            .trim()
+            .to_string();
+    }
+
+    // Search for the paragraph containing these keywords
+    let paragraphs: Vec<&str> = body.split("\n\n").collect();
+    for para in &paragraphs {
+        let lower = para.to_lowercase();
+        if keywords.iter().all(|k| lower.contains(&k.to_lowercase())) {
+            return para.trim().to_string();
+        }
+    }
+
+    // Fallback: return first paragraph
+    paragraphs
+        .first()
+        .unwrap_or(&body)
+        .trim()
+        .to_string()
+}
+
+/// Strip HTML tags from a string.
+fn strip_tags(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut in_tag = false;
+    for c in s.chars() {
+        match c {
+            '<' => in_tag = true,
+            '>' => in_tag = false,
+            _ if !in_tag => result.push(c),
+            _ => {}
+        }
+    }
+    result
 }
 
 /// Sanitize a user query for FTS5 MATCH syntax.

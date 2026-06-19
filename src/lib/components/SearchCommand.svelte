@@ -63,7 +63,7 @@
   }
 
   function selectResult(result: SearchResult) {
-    selectedDocument.select(result.path, result.snippet);
+    selectedDocument.select(result.path, result.paragraph || result.snippet);
     open = false;
   }
 
@@ -138,8 +138,8 @@
               <span class="text-xs text-foreground font-medium truncate">
                 {result.title || result.path.split(/[/\\]/).pop()}
               </span>
-              <span class="text-[11px] text-muted-foreground line-clamp-2">
-                {@html result.snippet}
+              <span class="text-[11px] text-muted-foreground line-clamp-3">
+                {@html result.paragraph || result.snippet}
               </span>
             </button>
           {/each}

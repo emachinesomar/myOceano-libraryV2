@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { TreeNode } from '$lib/types';
+  import TreeItem from './TreeItem.svelte';
 
   let { nodes }: { nodes: TreeNode[] } = $props();
 </script>
