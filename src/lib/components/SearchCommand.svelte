@@ -88,9 +88,10 @@
     <div
       class="w-full max-w-lg bg-background border border-border rounded-xl shadow-2xl overflow-hidden"
       onclick={(e) => e.stopPropagation()}
+      onkeydown={(e) => { if (e.key === 'Escape') open = false; }}
       role="dialog"
       aria-label="Buscar documentos"
-      tabindex="-1"
+      tabindex="0"
     >
       <!-- Search input -->
       <div class="flex items-center gap-3 px-4 border-b border-border">

@@ -1,12 +1,19 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { readDocument } from '$lib/tauri';
+  import { marked } from 'marked';
 
   let documentPath = $state<string | null>(null);
   let content = $state('');
   let loading = $state(false);
   let error = $state('');
   let searchSnippet = $state('');
+
+  // Configure marked for safe rendering
+  marked.setOptions({
+    breaks: true,
+    gfm: true,
+  });
 
   // Listen for document selection events
   onMount(() => {
@@ -37,6 +44,11 @@
   function formatPath(path: string): string {
     const parts = path.replace(/\\/g, '/').split('/');
     return parts.slice(-3).join(' / ');
+  }
+
+  // Render markdown to HTML
+  function renderMarkdown(text: string): string {
+    return marked.parse(text) as string;
   }
 </script>
 
@@ -90,12 +102,7 @@
         </div>
       {:else}
         <article class="reading-width mx-auto reading-prose text-foreground">
-          <!-- Render markdown as simple paragraphs -->
-          {#each content.split('\n\n') as paragraph}
-            {#if paragraph.trim()}
-              <p class="mb-4">{paragraph.trim()}</p>
-            {/if}
-          {/each}
+          {@html renderMarkdown(content)}
         </article>
       {/if}
     </div>

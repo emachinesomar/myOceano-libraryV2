@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import type { TreeNode } from '$lib/types';
-  import { getDocumentTree, indexDirectory } from '$lib/tauri';
+  import { getDocumentTree, indexDirectory, clearIndex } from '$lib/tauri';
   import DocumentTree from './DocumentTree.svelte';
 
   let { open = $bindable(true) }: { open: boolean } = $props();
@@ -65,6 +65,17 @@
 
     indexing = false;
   }
+
+  async function handleClearIndex() {
+    if (!confirm('¿Limpiar el índice? Se perderán todos los documentos indexados.')) return;
+    try {
+      await clearIndex();
+      tree = [];
+      console.log('Index cleared');
+    } catch (e) {
+      console.error('Failed to clear index:', e);
+    }
+  }
 </script>
 
 <aside
@@ -106,6 +117,18 @@
           Indexar carpeta
         {/if}
       </button>
+
+      {#if tree.length > 0}
+        <button
+          class="w-full mt-2 inline-flex items-center justify-center gap-2 rounded-lg bg-destructive/10 px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/20 transition-colors"
+          onclick={handleClearIndex}
+        >
+          <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          Limpiar índice
+        </button>
+      {/if}
     </div>
 
     <!-- Tree -->

@@ -117,3 +117,76 @@ mark {
 .dark mark {
   @apply bg-yellow-500/30 text-yellow-200;
 }
+
+/* Markdown rendered content */
+.reading-prose h1 {
+  @apply text-2xl font-bold mt-8 mb-4 text-foreground;
+}
+
+.reading-prose h2 {
+  @apply text-xl font-bold mt-6 mb-3 text-foreground;
+}
+
+.reading-prose h3 {
+  @apply text-lg font-semibold mt-5 mb-2 text-foreground;
+}
+
+.reading-prose p {
+  @apply mb-4 leading-relaxed;
+}
+
+.reading-prose ul {
+  @apply list-disc pl-6 mb-4 space-y-1;
+}
+
+.reading-prose ol {
+  @apply list-decimal pl-6 mb-4 space-y-1;
+}
+
+.reading-prose li {
+  @apply leading-relaxed;
+}
+
+.reading-prose blockquote {
+  @apply border-l-4 border-primary/30 pl-4 italic text-muted-foreground my-4;
+}
+
+.reading-prose code {
+  @apply bg-muted px-1.5 py-0.5 rounded text-sm font-mono;
+}
+
+.reading-prose pre {
+  @apply bg-muted p-4 rounded-lg overflow-x-auto mb-4;
+}
+
+.reading-prose pre code {
+  @apply bg-transparent p-0;
+}
+
+.reading-prose a {
+  @apply text-primary underline underline-offset-2 hover:text-primary/80;
+}
+
+.reading-prose hr {
+  @apply border-border my-8;
+}
+
+.reading-prose strong {
+  @apply font-bold text-foreground;
+}
+
+.reading-prose em {
+  @apply italic;
+}
+
+.reading-prose table {
+  @apply w-full border-collapse mb-4;
+}
+
+.reading-prose th {
+  @apply border border-border px-3 py-2 text-left font-semibold bg-muted;
+}
+
+.reading-prose td {
+  @apply border border-border px-3 py-2;
+}
