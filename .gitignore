@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build
+build/
+dist/
+.vite/
+
+# Tauri
+src-tauri/target/
+src-tauri/WixTools/
+src-tauri/Frameworks/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Database
+*.db
+*.db-wal
+*.db-shm
