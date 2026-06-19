@@ -8,6 +8,14 @@
   let loading = $state(false);
   let error = $state('');
   let searchSnippet = $state('');
+  let scrollEl = $state<HTMLDivElement>();
+
+  // Scroll to top when document changes
+  $effect(() => {
+    if (content && scrollEl) {
+      scrollEl.scrollTop = 0;
+    }
+  });
 
   // Configure marked for safe rendering
   marked.setOptions({
@@ -88,7 +96,7 @@
     {/if}
 
     <!-- Document content -->
-    <div class="flex-1 overflow-auto smooth-scroll px-6 py-6">
+    <div class="flex-1 overflow-auto smooth-scroll px-6 py-6" bind:this={scrollEl}>
       {#if loading}
         <div class="flex items-center justify-center py-12">
           <svg class="h-6 w-6 animate-spin text-muted-foreground" fill="none" viewBox="0 0 24 24">

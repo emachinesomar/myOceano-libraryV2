@@ -2,6 +2,7 @@
   import { tick } from 'svelte';
   import type { SearchResult } from '$lib/types';
   import { searchDocuments } from '$lib/tauri';
+  import { toasts } from '$lib/stores/toast';
 
   let { open = $bindable(false) }: { open: boolean } = $props();
 
@@ -38,6 +39,7 @@
         selectedIndex = 0;
       } catch (e) {
         console.error('Search failed:', e);
+        toasts.error('Error en la búsqueda');
         results = [];
       }
       loading = false;

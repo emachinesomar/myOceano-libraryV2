@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0ea5e9"/>
+      <stop offset="100%" stop-color="#0369a1"/>
+    </linearGradient>
+  </defs>
+  <!-- Book -->
+  <path d="M6 5h9v22H6a1 1 0 01-1-1V6a1 1 0 011-1z" fill="url(#g)"/>
+  <path d="M17 5h9a1 1 0 011 1v20a1 1 0 01-1 1h-9V5z" fill="#38bdf8"/>
+  <!-- Spine line -->
+  <line x1="16" y1="5" x2="16" y2="27" stroke="#0c4a6e" stroke-width="0.5"/>
+  <!-- Waves on cover -->
+  <path d="M7 14q2-2 4 0t4 0 4 0 4 0" fill="none" stroke="white" stroke-width="1.2" opacity="0.7"/>
+  <path d="M7 17q2-2 4 0t4 0 4 0 4 0" fill="none" stroke="white" stroke-width="1" opacity="0.5"/>
+  <path d="M7 20q2-2 4 0t4 0 4 0 4 0" fill="none" stroke="white" stroke-width="0.8" opacity="0.3"/>
+</svg>

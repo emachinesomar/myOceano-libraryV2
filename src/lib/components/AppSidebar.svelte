@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import type { TreeNode } from '$lib/types';
   import { getDocumentTree, indexDirectory, clearIndex } from '$lib/tauri';
+  import { toasts } from '$lib/stores/toast';
   import DocumentTree from './DocumentTree.svelte';
 
   let { open = $bindable(true) }: { open: boolean } = $props();
@@ -21,6 +22,7 @@
       tree = await getDocumentTree();
     } catch (e) {
       console.error('Failed to load tree:', e);
+      toasts.error('Error al cargar el árbol de documentos');
     }
     loading = false;
   }
@@ -57,10 +59,16 @@
       const result = await indexDirectory(path);
       unlisten();
 
+      if (result.errors.length > 0) {
+        toasts.error(`Indexados ${result.indexed} archivos, ${result.errors.length} errores`);
+      } else {
+        toasts.success(`Indexados ${result.indexed} archivos en ${result.duration_ms}ms`);
+      }
       console.log(`Indexed ${result.indexed} files in ${result.duration_ms}ms`);
       await loadTree();
     } catch (e) {
       console.error('Indexing failed:', e);
+      toasts.error(`Error al indexar: ${String(e)}`);
     }
 
     indexing = false;
@@ -71,9 +79,11 @@
     try {
       await clearIndex();
       tree = [];
+      toasts.success('Índice limpiado');
       console.log('Index cleared');
     } catch (e) {
       console.error('Failed to clear index:', e);
+      toasts.error('Error al limpiar el índice');
     }
   }
 </script>
