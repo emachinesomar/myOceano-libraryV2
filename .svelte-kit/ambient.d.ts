@@ -40,6 +40,7 @@
 declare module '$env/static/private' {
 	export const ALLUSERSPROFILE: string;
 	export const APPDATA: string;
+	export const COLOR: string;
 	export const CommonProgramFiles: string;
 	export const CommonProgramW6432: string;
 	export const COMPUTERNAME: string;
@@ -47,7 +48,8 @@ declare module '$env/static/private' {
 	export const COREPACK_ENABLE_DOWNLOAD_PROMPT: string;
 	export const COREPACK_ROOT: string;
 	export const DriverData: string;
-	export const EFC_13264: string;
+	export const EDITOR: string;
+	export const EFC_3608: string;
 	export const FPS_BROWSER_APP_PROFILE_STRING: string;
 	export const FPS_BROWSER_USER_PROFILE_STRING: string;
 	export const HOME: string;
@@ -60,11 +62,18 @@ declare module '$env/static/private' {
 	export const NODE_ENV: string;
 	export const NODE_PATH: string;
 	export const npm_command: string;
+	export const npm_config_cache: string;
 	export const npm_config_frozen_lockfile: string;
 	export const npm_config_globalconfig: string;
+	export const npm_config_global_prefix: string;
+	export const npm_config_init_module: string;
+	export const npm_config_local_prefix: string;
 	export const npm_config_node_gyp: string;
 	export const npm_config_npm_globalconfig: string;
+	export const npm_config_npm_version: string;
+	export const npm_config_prefix: string;
 	export const npm_config_registry: string;
+	export const npm_config_userconfig: string;
 	export const npm_config_user_agent: string;
 	export const npm_config_verify_deps_before_run: string;
 	export const npm_config__jsr_registry: string;
@@ -77,7 +86,6 @@ declare module '$env/static/private' {
 	export const npm_package_version: string;
 	export const NUMBER_OF_PROCESSORS: string;
 	export const OneDrive: string;
-	export const OneDriveConsumer: string;
 	export const OS: string;
 	export const Path: string;
 	export const PATHEXT: string;
@@ -113,12 +121,17 @@ declare module '$env/static/private' {
 	export const USERPROFILE: string;
 	export const WARP_CLIENT_VERSION: string;
 	export const WARP_CLI_AGENT_PROTOCOL_VERSION: string;
+	export const WARP_FOCUS_URL: string;
 	export const WARP_HONOR_PS1: string;
 	export const WARP_IS_LOCAL_SHELL_SESSION: string;
 	export const WARP_PATH_APPEND: string;
+	export const WARP_PROMPT_NODE_VERSION_ENABLED: string;
 	export const WARP_SHELL_DEBUG_MODE: string;
+	export const WARP_SSH_REUSE_CONTROL_MASTER: string;
+	export const WARP_TERMINAL_SESSION_UUID: string;
 	export const WARP_USE_SSH_WRAPPER: string;
 	export const windir: string;
+	export const __COMPAT_LAYER: string;
 }
 
 /**
@@ -207,6 +220,7 @@ declare module '$env/dynamic/private' {
 	export const env: {
 		ALLUSERSPROFILE: string;
 		APPDATA: string;
+		COLOR: string;
 		CommonProgramFiles: string;
 		CommonProgramW6432: string;
 		COMPUTERNAME: string;
@@ -214,7 +228,8 @@ declare module '$env/dynamic/private' {
 		COREPACK_ENABLE_DOWNLOAD_PROMPT: string;
 		COREPACK_ROOT: string;
 		DriverData: string;
-		EFC_13264: string;
+		EDITOR: string;
+		EFC_3608: string;
 		FPS_BROWSER_APP_PROFILE_STRING: string;
 		FPS_BROWSER_USER_PROFILE_STRING: string;
 		HOME: string;
@@ -227,11 +242,18 @@ declare module '$env/dynamic/private' {
 		NODE_ENV: string;
 		NODE_PATH: string;
 		npm_command: string;
+		npm_config_cache: string;
 		npm_config_frozen_lockfile: string;
 		npm_config_globalconfig: string;
+		npm_config_global_prefix: string;
+		npm_config_init_module: string;
+		npm_config_local_prefix: string;
 		npm_config_node_gyp: string;
 		npm_config_npm_globalconfig: string;
+		npm_config_npm_version: string;
+		npm_config_prefix: string;
 		npm_config_registry: string;
+		npm_config_userconfig: string;
 		npm_config_user_agent: string;
 		npm_config_verify_deps_before_run: string;
 		npm_config__jsr_registry: string;
@@ -244,7 +266,6 @@ declare module '$env/dynamic/private' {
 		npm_package_version: string;
 		NUMBER_OF_PROCESSORS: string;
 		OneDrive: string;
-		OneDriveConsumer: string;
 		OS: string;
 		Path: string;
 		PATHEXT: string;
@@ -280,12 +301,17 @@ declare module '$env/dynamic/private' {
 		USERPROFILE: string;
 		WARP_CLIENT_VERSION: string;
 		WARP_CLI_AGENT_PROTOCOL_VERSION: string;
+		WARP_FOCUS_URL: string;
 		WARP_HONOR_PS1: string;
 		WARP_IS_LOCAL_SHELL_SESSION: string;
 		WARP_PATH_APPEND: string;
+		WARP_PROMPT_NODE_VERSION_ENABLED: string;
 		WARP_SHELL_DEBUG_MODE: string;
+		WARP_SSH_REUSE_CONTROL_MASTER: string;
+		WARP_TERMINAL_SESSION_UUID: string;
 		WARP_USE_SSH_WRAPPER: string;
 		windir: string;
+		__COMPAT_LAYER: string;
 		[key: `PUBLIC_${string}`]: undefined;
 		[key: `${string}`]: string | undefined;
 	}
