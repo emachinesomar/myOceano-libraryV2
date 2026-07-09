@@ -1,14 +1,70 @@
 use crate::db::Database;
 use crate::parser::{infer_metadata_from_path, merge_metadata, parse_markdown_content};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::sync::Arc;
 use std::time::Instant;
 use walkdir::WalkDir;
 
-/// Extract text from a PDF file using pdf-extract.
+/// Embedded Python script for PyMuPDF fallback extraction.
+const PYMUPDF_SCRIPT: &str = include_str!("../scripts/pymupdf_extract.py");
+
+/// Extract text from a PDF file. Tries pdf-extract first, falls back to PyMuPDF.
 fn extract_pdf_text(path: &Path) -> Result<String, String> {
-    pdf_extract::extract_text(path)
-        .map_err(|e| format!("PDF extraction failed: {}", e))
+    // Try pdf-extract first
+    match pdf_extract::extract_text(path) {
+        Ok(text) if !text.trim().is_empty() => return Ok(text),
+        Ok(_) => {} // Empty text, try fallback
+        Err(_) => {} // Error, try fallback
+    }
+
+    // Fallback: PyMuPDF via Python
+    extract_pdf_text_pymupdf(path)
+}
+
+/// Extract text using PyMuPDF (Python subprocess).
+fn extract_pdf_text_pymupdf(path: &Path) -> Result<String, String> {
+    // Write embedded script to temp file
+    let script_dir = std::env::temp_dir().join("ocean_library");
+    std::fs::create_dir_all(&script_dir).map_err(|e| e.to_string())?;
+    let script_path = script_dir.join("pymupdf_extract.py");
+    std::fs::write(&script_path, PYMUPDF_SCRIPT).map_err(|e| e.to_string())?;
+
+    // Find Python executable
+    let python = find_python().ok_or("Python not found for PyMuPDF fallback")?;
+
+    let output = Command::new(&python)
+        .arg(script_path.to_str().unwrap_or_default())
+        .arg(path.to_str().unwrap_or_default())
+        .output()
+        .map_err(|e| format!("Failed to run PyMuPDF: {}", e))?;
+
+    if output.status.success() {
+        let text = String::from_utf8_lossy(&output.stdout).to_string();
+        if text.trim().is_empty() {
+            Err("PyMuPDF returned empty text".to_string())
+        } else {
+            Ok(text)
+        }
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        Err(format!("PyMuPDF failed: {}", stderr))
+    }
+}
+
+/// Try to find a Python executable on the system.
+fn find_python() -> Option<String> {
+    for name in &["python", "python3", "py"] {
+        if Command::new(name)
+            .arg("--version")
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+        {
+            return Some(name.to_string());
+        }
+    }
+    None
 }
 
 /// Result of scanning a directory for Markdown files.
