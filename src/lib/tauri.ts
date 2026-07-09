@@ -38,6 +38,13 @@ export async function clearIndex(): Promise<void> {
 }
 
 /**
+ * Delete a single document by path.
+ */
+export async function deleteDocument(path: string): Promise<void> {
+  return invoke<void>('delete_document', { path });
+}
+
+/**
  * Get the total number of indexed documents.
  */
 export async function getIndexStats(): Promise<{ total: number; last_indexed: string | null }> {
@@ -80,4 +87,18 @@ export async function getDocumentMetadata(path: string): Promise<{
   language: string | null;
 }> {
   return invoke('get_document_metadata', { path });
+}
+
+/**
+ * Bulk update religion for all documents with a given religion.
+ */
+export async function updateReligionBulk(oldReligion: string, newReligion: string): Promise<number> {
+  return invoke<number>('update_religion_bulk', { oldReligion, newReligion });
+}
+
+/**
+ * Bulk update book for all documents with a given religion + book.
+ */
+export async function updateBookBulk(religion: string, oldBook: string, newBook: string): Promise<number> {
+  return invoke<number>('update_book_bulk', { religion, oldBook, newBook });
 }

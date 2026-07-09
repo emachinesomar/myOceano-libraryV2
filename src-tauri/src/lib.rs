@@ -129,6 +129,16 @@ async fn clear_index(app: tauri::AppHandle) -> Result<(), String> {
         .map_err(|e| format!("Clear failed: {}", e))
 }
 
+/// Delete a single document by path.
+#[tauri::command]
+async fn delete_document(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    let state = app.state::<Arc<AppState>>();
+
+    let db = &state.db;
+    db.delete_document(&path)
+        .map_err(|e| format!("Delete failed: {}", e))
+}
+
 /// Get index statistics.
 #[tauri::command]
 async fn get_index_stats(app: tauri::AppHandle) -> Result<IndexStats, String> {
@@ -192,6 +202,33 @@ async fn get_document_metadata(
         .ok_or_else(|| format!("Metadata not found for: {}", path))
 }
 
+/// Bulk update religion for all documents with a given religion.
+#[tauri::command]
+async fn update_religion_bulk(
+    old_religion: String,
+    new_religion: String,
+    app: tauri::AppHandle,
+) -> Result<usize, String> {
+    let state = app.state::<Arc<AppState>>();
+    let db = &state.db;
+    db.update_religion_bulk(&old_religion, &new_religion)
+        .map_err(|e| format!("Bulk religion update failed: {}", e))
+}
+
+/// Bulk update book for all documents with a given religion + book.
+#[tauri::command]
+async fn update_book_bulk(
+    religion: String,
+    old_book: String,
+    new_book: String,
+    app: tauri::AppHandle,
+) -> Result<usize, String> {
+    let state = app.state::<Arc<AppState>>();
+    let db = &state.db;
+    db.update_book_bulk(&religion, &old_book, &new_book)
+        .map_err(|e| format!("Bulk book update failed: {}", e))
+}
+
 // ──────────────────────────── Types ────────────────────────────
 
 #[derive(Clone, serde::Serialize)]
@@ -238,6 +275,8 @@ struct TreeNodeJson {
     count: usize,
     children: Vec<TreeNodeJson>,
     path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    religion: Option<String>,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -251,8 +290,8 @@ struct IndexStats {
 fn build_tree(entries: Vec<db::TreeEntry>) -> Vec<TreeNodeJson> {
     use std::collections::HashMap;
 
+    // Group by religion > book
     let mut religions: HashMap<String, HashMap<String, Vec<db::TreeEntry>>> = HashMap::new();
-
     for entry in entries {
         religions
             .entry(entry.religion.clone())
@@ -267,24 +306,69 @@ fn build_tree(entries: Vec<db::TreeEntry>) -> Vec<TreeNodeJson> {
         .map(|(religion, books)| {
             let book_nodes: Vec<TreeNodeJson> = books
                 .into_iter()
-                .map(|(book, entries)| {
-                    let chapter_nodes: Vec<TreeNodeJson> = entries
-                        .into_iter()
-                        .map(|e| TreeNodeJson {
-                            name: e.chapter.clone(),
-                            node_type: "document".to_string(),
-                            count: 1,
-                            children: vec![],
-                            path: Some(e.path),
-                        })
-                        .collect();
-
-                    TreeNodeJson {
-                        name: book,
-                        node_type: "book".to_string(),
-                        count: chapter_nodes.len(),
-                        children: chapter_nodes,
-                        path: None,
+                .flat_map(|(book, entries)| {
+                    if book == "Instituto Ruhí" {
+                        // Group Ruhí entries by chapter (Libro X)
+                        let mut chapters: HashMap<String, Vec<db::TreeEntry>> = HashMap::new();
+                        for e in entries {
+                            chapters
+                                .entry(e.chapter.clone())
+                                .or_default()
+                                .push(e);
+                        }
+                        let chapter_nodes: Vec<TreeNodeJson> = chapters
+                            .into_iter()
+                            .map(|(chapter, chapter_entries)| {
+                                let doc_nodes: Vec<TreeNodeJson> = chapter_entries
+                                    .into_iter()
+                                    .map(|e| TreeNodeJson {
+                                        name: e.filename.clone(),
+                                        node_type: "document".to_string(),
+                                        count: 1,
+                                        children: vec![],
+                                        path: Some(e.path),
+                                        religion: None,
+                                    })
+                                    .collect();
+                                TreeNodeJson {
+                                    name: chapter,
+                                    node_type: "chapter".to_string(),
+                                    count: doc_nodes.len(),
+                                    children: doc_nodes,
+                                    path: None,
+                                    religion: Some(religion.clone()),
+                                }
+                            })
+                            .collect();
+                        vec![TreeNodeJson {
+                            name: book,
+                            node_type: "book".to_string(),
+                            count: chapter_nodes.len(),
+                            children: chapter_nodes,
+                            path: None,
+                            religion: Some(religion.clone()),
+                        }]
+                    } else {
+                        // Non-Ruhí: group under "Libros" parent
+                        let doc_nodes: Vec<TreeNodeJson> = entries
+                            .into_iter()
+                            .map(|e| TreeNodeJson {
+                                name: e.filename.clone(),
+                                node_type: "document".to_string(),
+                                count: 1,
+                                children: vec![],
+                                path: Some(e.path),
+                                religion: None,
+                            })
+                            .collect();
+                        vec![TreeNodeJson {
+                            name: book,
+                            node_type: "book".to_string(),
+                            count: doc_nodes.len(),
+                            children: doc_nodes,
+                            path: None,
+                            religion: Some(religion.clone()),
+                        }]
                     }
                 })
                 .collect();
@@ -295,6 +379,7 @@ fn build_tree(entries: Vec<db::TreeEntry>) -> Vec<TreeNodeJson> {
                 count: book_nodes.len(),
                 children: book_nodes,
                 path: None,
+                religion: None,
             }
         })
         .collect()
@@ -337,10 +422,13 @@ pub fn run() {
             get_document_tree,
             read_document,
             clear_index,
+            delete_document,
             get_index_stats,
             get_fts_stats,
             update_document_metadata,
             get_document_metadata,
+            update_religion_bulk,
+            update_book_bulk,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

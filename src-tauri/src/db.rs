@@ -149,6 +149,53 @@ impl Database {
         }
     }
 
+    /// Bulk update religion for all documents with a given religion.
+    pub fn update_religion_bulk(
+        &self,
+        old_religion: &str,
+        new_religion: &str,
+    ) -> SqlResult<usize> {
+        let conn = self.conn.lock().unwrap();
+
+        // Update document_metadata
+        let count = conn.execute(
+            "UPDATE document_metadata SET religion = ?2 WHERE religion = ?1",
+            rusqlite::params![old_religion, new_religion],
+        )?;
+
+        // Update documents_content (for FTS)
+        conn.execute(
+            "UPDATE documents_content SET religion = ?2 WHERE religion = ?1",
+            rusqlite::params![old_religion, new_religion],
+        )?;
+
+        Ok(count)
+    }
+
+    /// Bulk update book for all documents with a given religion + book.
+    pub fn update_book_bulk(
+        &self,
+        religion: &str,
+        old_book: &str,
+        new_book: &str,
+    ) -> SqlResult<usize> {
+        let conn = self.conn.lock().unwrap();
+
+        // Update document_metadata
+        let count = conn.execute(
+            "UPDATE document_metadata SET book = ?3 WHERE religion = ?1 AND book = ?2",
+            rusqlite::params![religion, old_book, new_book],
+        )?;
+
+        // Update documents_content (for FTS)
+        conn.execute(
+            "UPDATE documents_content SET book = ?3 WHERE religion = ?1 AND book = ?2",
+            rusqlite::params![religion, old_book, new_book],
+        )?;
+
+        Ok(count)
+    }
+
     /// Insert into FTS5 content table and the virtual table.
     pub fn insert_fts(
         &self,
@@ -354,17 +401,86 @@ impl Database {
         }
     }
 
-    /// Clear all data from the index.
+    /// Clear all data from the index (drop and recreate tables).
     pub fn clear_all(&self) -> SqlResult<()> {
         let conn = self.conn.lock().unwrap();
         conn.execute_batch(
             "
-            DELETE FROM documents_fts;
-            DELETE FROM documents_content;
-            DELETE FROM document_metadata;
-            DELETE FROM files;
+            DROP TABLE IF EXISTS documents_fts;
+            DROP TABLE IF EXISTS documents_content;
+            DROP TABLE IF EXISTS document_metadata;
+            DROP TABLE IF EXISTS files;
+
+            CREATE TABLE IF NOT EXISTS files (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                path        TEXT NOT NULL UNIQUE,
+                filename    TEXT NOT NULL,
+                extension   TEXT NOT NULL,
+                size_bytes  INTEGER NOT NULL,
+                mtime       TEXT NOT NULL,
+                indexed_at  TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE TABLE IF NOT EXISTS document_metadata (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                file_id     INTEGER NOT NULL UNIQUE,
+                religion    TEXT,
+                book        TEXT,
+                chapter     TEXT,
+                verse       TEXT,
+                title       TEXT,
+                author      TEXT,
+                language    TEXT,
+                tags        TEXT,
+                FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE
+            );
+
+            CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(
+                path,
+                title,
+                author,
+                religion,
+                book,
+                body,
+                content='documents_content',
+                content_rowid='rowid',
+                tokenize='unicode61 remove_diacritics 2'
+            );
+
+            CREATE TABLE IF NOT EXISTS documents_content (
+                rowid  INTEGER PRIMARY KEY,
+                path   TEXT NOT NULL,
+                title  TEXT,
+                author TEXT,
+                religion TEXT,
+                book   TEXT,
+                body   TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_files_path ON files(path);
+            CREATE INDEX IF NOT EXISTS idx_metadata_religion ON document_metadata(religion);
+            CREATE INDEX IF NOT EXISTS idx_metadata_book ON document_metadata(book);
+            CREATE INDEX IF NOT EXISTS idx_metadata_chapter ON document_metadata(chapter);
+            CREATE INDEX IF NOT EXISTS idx_content_rowid ON documents_content(rowid);
             ",
         )?;
+        Ok(())
+    }
+
+    /// Delete a single document by path from all tables.
+    pub fn delete_document(&self, path: &str) -> SqlResult<()> {
+        let conn = self.conn.lock().unwrap();
+        // Get file_id first
+        let file_id: i64 = conn.query_row(
+            "SELECT id FROM files WHERE path = ?1",
+            rusqlite::params![path],
+            |row| row.get(0),
+        )?;
+        // FTS5 external content: delete from FTS first, then content, then metadata, then files
+        conn.execute("DELETE FROM documents_fts WHERE path = ?1", rusqlite::params![path])?;
+        conn.execute("DELETE FROM documents_content WHERE path = ?1", rusqlite::params![path])?;
+        conn.execute("DELETE FROM document_metadata WHERE file_id = ?1", rusqlite::params![file_id])?;
+        conn.execute("DELETE FROM files WHERE id = ?1", rusqlite::params![file_id])?;
         Ok(())
     }
 

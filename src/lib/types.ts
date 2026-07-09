@@ -40,6 +40,7 @@ export interface TreeNode {
   count: number;
   children: TreeNode[];
   path?: string;
+  religion?: string; // Inherited religion name for book nodes
 }
 
 /** Search response with pagination */

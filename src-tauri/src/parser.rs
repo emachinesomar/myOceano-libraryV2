@@ -74,6 +74,42 @@ pub fn infer_metadata_from_path(path: &Path) -> DocumentMetadata {
         }
     }
 
+    // Pattern 2: Baha'i books with known keywords (Cristo, Baha'u'lláh, CIE, etc.)
+    if let Some(filename) = path.file_stem().and_then(|s| s.to_str()) {
+        let lower = filename.to_lowercase();
+        let baha_keywords = [
+            // Figures
+            "baha", "bahai", "bahá", "baha'u'llah", "bahaullah",
+            "cristo", "shoghi", "abdul-baha", "ábdu'l-bahá",
+            "the báb", "el báb", "mazal",
+            // Institutions
+            "cie", "centro internacional", "guardian",
+            "casa universal", "justicia universal",
+            "casa de justicia", "hands of the cause",
+            // Key texts
+            "kitáb-i-aqdas", "kitáb-i-íqán", "aqdas", "íqán",
+            "gleanings", "compendium", "world order",
+            "divine plan", "crusade", "tablets",
+            "tablet of ahmad", "lawh-i-akbar",
+            // Practices & events
+            "naw-ruz", "ridvan", "fast", "feast",
+            "holy day", "declaration", "ascension",
+            "birth", "martyrdom", "intercalation",
+            "badí'", "sacred writings",
+            // Community
+            "pioneering", "study circle", "devotional",
+            "junior youth", "children's class",
+            "community building", "growth",
+        ];
+        if baha_keywords.iter().any(|kw| lower.contains(kw)) {
+            meta.religion = Some("Fe bahá'í".to_string());
+            meta.book = Some("Libros".to_string());
+            meta.title = Some(filename.to_string());
+            meta.language = Some("Castellano".to_string());
+            return meta;
+        }
+    }
+
     // Pattern 2: Detect religion from folder path components
     let components: Vec<&str> = path
         .components()
@@ -328,10 +364,92 @@ tags:
     }
 
     #[test]
+    fn test_infer_baha_book_libros() {
+        let path = Path::new("samples/LO-George-Townshend_Cristo_y_Bahaullah.pdf");
+        let meta = infer_metadata_from_path(path);
+        assert_eq!(meta.religion.as_deref(), Some("Fe bahá'í"));
+        assert_eq!(meta.book.as_deref(), Some("Libros"));
+        assert!(meta.title.unwrap().contains("Cristo"));
+    }
+
+    #[test]
     fn test_infer_from_folder_path() {
         let path = Path::new("library/islam/quran/chapter1.md");
         let meta = infer_metadata_from_path(path);
         assert_eq!(meta.religion.as_deref(), Some("Islam"));
         assert_eq!(meta.book.as_deref(), Some("Corán"));
+    }
+
+    #[test]
+    fn test_infer_all_sample_files() {
+        let samples_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .join("samples");
+
+        if !samples_dir.exists() {
+            return; // Skip if samples not present
+        }
+
+        // Files that MUST be classified as Fe bahá'í
+        let must_classify = [
+            "Mensaje de Ridvan 179",
+            "Mensaje de Ridvan 180",
+            "CUJ",
+            "Libro 1",
+            "Libro 10",
+            "Libro 11",
+            "Libro 12",
+            "Libro 13",
+            "Libro 14",
+            "Cristo_y_Bahaullah",
+        ];
+
+        let mut checked = 0;
+        let mut unclassified = Vec::new();
+        for entry in walkdir::WalkDir::new(&samples_dir)
+            .follow_links(true)
+            .into_iter()
+            .filter_entry(|e| {
+                let name = e.file_name().to_string_lossy().to_lowercase();
+                !name.starts_with('.') && name != "node_modules"
+            })
+        {
+            let entry = entry.unwrap();
+            if entry.file_type().is_file() {
+                let path = entry.path();
+                let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+                if ext == "pdf" || ext == "md" {
+                    let meta = infer_metadata_from_path(path);
+                    let filename = path.file_name().unwrap().to_string_lossy();
+
+                    if must_classify.iter().any(|pat| filename.contains(pat)) {
+                        assert!(
+                            meta.religion.is_some(),
+                            "Expected religion for: {}",
+                            filename
+                        );
+                        assert_eq!(
+                            meta.religion.as_deref(),
+                            Some("Fe bahá'í"),
+                            "Wrong religion for: {}",
+                            filename
+                        );
+                    }
+
+                    if meta.religion.is_none() {
+                        unclassified.push(filename.to_string());
+                    }
+                    checked += 1;
+                }
+            }
+        }
+        assert!(checked > 0, "No sample files found to check");
+        // Allow up to 3 unclassified files (ambiguous date-only names, etc.)
+        assert!(
+            unclassified.len() <= 3,
+            "Too many unclassified files: {:?}",
+            unclassified
+        );
     }
 }
