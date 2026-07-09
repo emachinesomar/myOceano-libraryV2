@@ -48,10 +48,24 @@ pub fn parse_markdown_content(content: &str) -> Result<ParsedDocument, String> {
 pub fn infer_metadata_from_path(path: &Path) -> DocumentMetadata {
     let mut meta = DocumentMetadata::default();
 
-    // Try Baha'i filename patterns first
+    let _path_str = path.to_string_lossy().to_lowercase();
+
+    // Pattern 0: Ruhí Institute books — "Libro X Unidad Y_..."
+    if let Some(filename) = path.file_stem().and_then(|s| s.to_str()) {
+        if let Some(ruhi_meta) = infer_ruhi_metadata(filename) {
+            meta.religion = Some("Fe bahá'í".to_string());
+            meta.book = Some("Instituto Ruhí".to_string());
+            meta.chapter = ruhi_meta.0; // "Libro X"
+            meta.title = ruhi_meta.1;   // unit title
+            meta.language = Some("Castellano".to_string());
+            return meta;
+        }
+    }
+
+    // Pattern 1: Baha'i filename patterns (Ridván, CUJ, date prefix)
     if let Some(filename) = path.file_stem().and_then(|s| s.to_str()) {
         if let Some(baha_meta) = infer_baha_metadata(filename) {
-            meta.religion = Some("Bahaismo".to_string());
+            meta.religion = Some("Fe bahá'í".to_string());
             meta.book = baha_meta.0; // message type: Ridván, CUJ, etc.
             meta.chapter = baha_meta.1; // year
             meta.title = Some(filename.to_string());
@@ -60,25 +74,35 @@ pub fn infer_metadata_from_path(path: &Path) -> DocumentMetadata {
         }
     }
 
-    // Fallback: detect religion from folder path components
+    // Pattern 2: Detect religion from folder path components
     let components: Vec<&str> = path
         .components()
         .filter_map(|c| c.as_os_str().to_str())
         .collect();
 
-    let religion_names = [
-        "islam", "cristianismo", "judaismo", "hinduismo", "budismo",
-        "bahaismo", "sintoismo", "zoroastrismo", "jainismo", "sijismo",
-        "christianity", "judaism", "hinduism", "buddhism",
-        "christian", "jewish", "muslim", "buddhist", "hindu",
+    // Map folder names to religion + book
+    let folder_map = [
+        ("ruhi",          "Fe bahá'í",  "Instituto Ruhí"),
+        ("bahaismo",      "Fe bahá'í",  ""),
+        ("bahai",         "Fe bahá'í",  ""),
+        ("islam",         "Islam",      "Corán"),
+        ("cristianismo",  "Cristianismo", "Biblia"),
+        ("judaismo",      "Judaísmo",   "Torá"),
+        ("hinduismo",     "Hinduismo",  "Bhagavad Gita"),
+        ("budismo",       "Budismo",    "Dhammapada"),
+        ("christianity",  "Cristianismo", "Biblia"),
+        ("judaism",       "Judaísmo",   "Torá"),
+        ("islam",         "Islam",      "Corán"),
     ];
 
     for (i, component) in components.iter().enumerate() {
         let lower = component.to_lowercase();
-        for name in &religion_names {
-            if lower.contains(name.trim()) {
-                meta.religion = Some(component.to_string());
-                if i + 1 < components.len() {
+        for (folder_name, religion, book) in &folder_map {
+            if lower.contains(folder_name) {
+                meta.religion = Some(religion.to_string());
+                if !book.is_empty() {
+                    meta.book = Some(book.to_string());
+                } else if i + 1 < components.len() {
                     meta.book = Some(components[i + 1].to_string());
                 }
                 break;
@@ -97,6 +121,52 @@ pub fn infer_metadata_from_path(path: &Path) -> DocumentMetadata {
     }
 
     meta
+}
+
+/// Infer Ruhí Institute metadata from a filename.
+/// Returns (book_number, unit_title) if recognized, None otherwise.
+///
+/// Patterns:
+/// - "Libro 10 Unidad 1_ Acompañarse..." → ("Libro 10", "Acompañarse...")
+/// - "Libro 1 Reflexiones..." → ("Libro 1", "Reflexiones...")
+/// - "Libro 3 Grado 3 Unidad 1_..." → ("Libro 3", "Grado 3 Unidad 1...")
+fn infer_ruhi_metadata(filename: &str) -> Option<(Option<String>, Option<String>)> {
+    let lower = filename.to_lowercase();
+
+    // Must contain "libro" to be a Ruhí book
+    if !lower.contains("libro") {
+        return None;
+    }
+
+    // Extract book number: "Libro X"
+    let re_book = Regex::new(r"(?i)libro\s+(\d+)").ok()?;
+    let book_num = re_book.captures(filename)?.get(1)?.as_str();
+
+    let chapter = Some(format!("Libro {}", book_num));
+
+    // Extract unit/grade info after book number for the title
+    // Patterns: "Unidad X_", "Grado X Unidad Y_", or just the rest
+    let re_unit = Regex::new(r"(?i)libro\s+\d+\s*(.*)").ok()?;
+    let title_suffix = if let Some(caps) = re_unit.captures(filename) {
+        let rest = caps.get(1)?.as_str().trim();
+        // Clean up: remove "_ocr.pdf" suffix and leading separators
+        let cleaned = rest
+            .trim_start_matches('_')
+            .trim_start_matches(' ')
+            .replace("_ocr", "")
+            .replace("_", " ")
+            .trim()
+            .to_string();
+        if cleaned.is_empty() {
+            None
+        } else {
+            Some(cleaned)
+        }
+    } else {
+        None
+    };
+
+    Some((chapter, title_suffix))
 }
 
 /// Infer Baha'i metadata from a filename.
@@ -214,7 +284,7 @@ tags:
     fn test_infer_baha_ridvan() {
         let path = Path::new("samples/Mensaje de Ridván 183 (2026) (CAST).pdf");
         let meta = infer_metadata_from_path(path);
-        assert_eq!(meta.religion.as_deref(), Some("Bahaismo"));
+        assert_eq!(meta.religion.as_deref(), Some("Fe bahá'í"));
         assert_eq!(meta.book.as_deref(), Some("Ridván"));
         assert_eq!(meta.chapter.as_deref(), Some("2026"));
     }
@@ -223,7 +293,7 @@ tags:
     fn test_infer_baha_date_prefix_without_cuj() {
         let path = Path::new("samples/051227 Mensaje a conferencia consejeros CAST.pdf");
         let meta = infer_metadata_from_path(path);
-        assert_eq!(meta.religion.as_deref(), Some("Bahaismo"));
+        assert_eq!(meta.religion.as_deref(), Some("Fe bahá'í"));
         assert_eq!(meta.book.as_deref(), Some("Mensaje a conferencia consejeros"));
         assert_eq!(meta.chapter.as_deref(), Some("2005"));
     }
@@ -232,16 +302,36 @@ tags:
     fn test_infer_baha_cuj_keyword() {
         let path = Path::new("samples/101228 CUJ, carta a CCs delineando nuevo Plan de 5 Años CAST.pdf");
         let meta = infer_metadata_from_path(path);
-        assert_eq!(meta.religion.as_deref(), Some("Bahaismo"));
+        assert_eq!(meta.religion.as_deref(), Some("Fe bahá'í"));
         assert_eq!(meta.book.as_deref(), Some("CUJ"));
         assert_eq!(meta.chapter.as_deref(), Some("2010"));
+    }
+
+    #[test]
+    fn test_infer_ruhi_book() {
+        let path = Path::new("samples/ruhi/Libro 10 Unidad 1_ Acompañarse unos a otros en el sendero del servicio_ocr.pdf");
+        let meta = infer_metadata_from_path(path);
+        assert_eq!(meta.religion.as_deref(), Some("Fe bahá'í"));
+        assert_eq!(meta.book.as_deref(), Some("Instituto Ruhí"));
+        assert_eq!(meta.chapter.as_deref(), Some("Libro 10"));
+        assert!(meta.title.unwrap().contains("Acompañarse"));
+    }
+
+    #[test]
+    fn test_infer_ruhi_book_simple() {
+        let path = Path::new("samples/ruhi/Libro 1 Reflexiones sobre la vida del espíritu_ocr.pdf");
+        let meta = infer_metadata_from_path(path);
+        assert_eq!(meta.religion.as_deref(), Some("Fe bahá'í"));
+        assert_eq!(meta.book.as_deref(), Some("Instituto Ruhí"));
+        assert_eq!(meta.chapter.as_deref(), Some("Libro 1"));
+        assert!(meta.title.unwrap().contains("Reflexiones"));
     }
 
     #[test]
     fn test_infer_from_folder_path() {
         let path = Path::new("library/islam/quran/chapter1.md");
         let meta = infer_metadata_from_path(path);
-        assert_eq!(meta.religion.as_deref(), Some("islam"));
-        assert_eq!(meta.book.as_deref(), Some("quran"));
+        assert_eq!(meta.religion.as_deref(), Some("Islam"));
+        assert_eq!(meta.book.as_deref(), Some("Corán"));
     }
 }

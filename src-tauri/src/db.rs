@@ -508,7 +508,7 @@ mod tests {
         // Insert metadata
         db.insert_metadata(
             file_id,
-            Some("Bahaismo"),
+            Some("Fe bahá'í"),
             Some("Ridván"),
             Some("2026"),
             None,
@@ -524,7 +524,7 @@ mod tests {
             "/test/sample.pdf",
             Some("Mensaje de Ridván"),
             None,
-            Some("Bahaismo"),
+            Some("Fe bahá'í"),
             Some("Ridván"),
             "Este es un mensaje sobre la fe y la comunidad en Bolivia.",
         )
@@ -547,7 +547,7 @@ mod tests {
         // Get tree
         let tree = db.get_document_tree().unwrap();
         assert_eq!(tree.len(), 1);
-        assert_eq!(tree[0].religion, "Bahaismo");
+        assert_eq!(tree[0].religion, "Fe bahá'í");
         assert_eq!(tree[0].book, "Ridván");
 
         // Stats
