@@ -1,29 +1,34 @@
 <script lang="ts">
   import type { TreeNode } from '$lib/types';
-  import { selectedDocument } from '$lib/stores/document';
+  import { selectedDocument, selectedPath } from '$lib/stores/document';
 
   let { node }: { node: TreeNode } = $props();
   let expanded = $state(false);
 
-  function toggle() {
-    if (node.children.length > 0) {
+  const isLeaf = $derived(node.children.length === 0);
+  const isSelected = $derived(isLeaf && $selectedPath === node.path);
+
+  function handleClick() {
+    if (isLeaf && node.path) {
+      selectedDocument.select(node.path);
+    } else if (!isLeaf) {
       expanded = !expanded;
     }
-  }
-
-  function selectDocument(path: string) {
-    selectedDocument.select(path);
   }
 </script>
 
 <div>
   <!-- Node header -->
   <button
-    class="w-full flex items-center gap-1.5 rounded-md px-2 py-1 text-left text-sm transition-colors hover:bg-sidebar-accent group"
-    onclick={toggle}
+    class="w-full flex items-center gap-1.5 rounded-md px-2 py-1 text-left text-sm transition-colors group"
+    class:hover:bg-sidebar-accent={!isSelected}
+    class:bg-sidebar-accent={isSelected}
+    class:text-sidebar-accent-foreground={isSelected}
+    class:font-medium={isSelected}
+    onclick={handleClick}
   >
     <!-- Expand/collapse icon -->
-    {#if node.children.length > 0}
+    {#if !isLeaf}
       <svg
         class="h-3 w-3 shrink-0 text-muted-foreground transition-transform duration-200"
         class:rotate-90={expanded}
@@ -53,12 +58,14 @@
     {/if}
 
     <!-- Name -->
-    <span class="truncate text-sidebar-foreground group-hover:text-sidebar-accent-foreground">
+    <span class="truncate text-sidebar-foreground group-hover:text-sidebar-accent-foreground"
+      class:text-primary={isSelected}
+    >
       {node.name}
     </span>
 
     <!-- Count badge -->
-    {#if node.children.length > 0}
+    {#if !isLeaf}
       <span class="ml-auto text-[10px] text-muted-foreground tabular-nums">
         {node.count}
       </span>
@@ -66,7 +73,7 @@
   </button>
 
   <!-- Children -->
-  {#if expanded && node.children.length > 0}
+  {#if expanded && !isLeaf}
     <div class="ml-3 pl-3 border-l border-sidebar-border">
       {#each node.children as child (child.name + child.type)}
         <svelte:self node={child} />
