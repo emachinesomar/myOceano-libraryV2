@@ -153,6 +153,45 @@ async fn get_fts_stats(app: tauri::AppHandle) -> Result<db::FtsStats, String> {
     db.get_fts_stats().map_err(|e| format!("FTS stats failed: {}", e))
 }
 
+/// Update document metadata for a given file path.
+#[tauri::command]
+async fn update_document_metadata(
+    path: String,
+    religion: Option<String>,
+    book: Option<String>,
+    chapter: Option<String>,
+    title: Option<String>,
+    author: Option<String>,
+    language: Option<String>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    let state = app.state::<Arc<AppState>>();
+    let db = &state.db;
+    db.update_metadata(
+        &path,
+        religion.as_deref(),
+        book.as_deref(),
+        chapter.as_deref(),
+        title.as_deref(),
+        author.as_deref(),
+        language.as_deref(),
+    )
+    .map_err(|e| format!("Update metadata failed: {}", e))
+}
+
+/// Get metadata for a document by path.
+#[tauri::command]
+async fn get_document_metadata(
+    path: String,
+    app: tauri::AppHandle,
+) -> Result<db::DocumentMetadataRow, String> {
+    let state = app.state::<Arc<AppState>>();
+    let db = &state.db;
+    db.get_metadata(&path)
+        .map_err(|e| format!("Get metadata failed: {}", e))?
+        .ok_or_else(|| format!("Metadata not found for: {}", path))
+}
+
 // ──────────────────────────── Types ────────────────────────────
 
 #[derive(Clone, serde::Serialize)]
@@ -300,6 +339,8 @@ pub fn run() {
             clear_index,
             get_index_stats,
             get_fts_stats,
+            update_document_metadata,
+            get_document_metadata,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

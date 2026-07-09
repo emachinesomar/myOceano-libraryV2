@@ -166,7 +166,7 @@
           <p class="text-[10px] text-muted-foreground/60 mt-1">Indexa una carpeta para comenzar</p>
         </div>
       {:else}
-        <DocumentTree nodes={tree} />
+        <DocumentTree nodes={tree} onMetadataSaved={loadTree} />
       {/if}
     </div>
 

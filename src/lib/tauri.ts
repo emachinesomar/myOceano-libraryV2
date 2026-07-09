@@ -50,3 +50,34 @@ export async function getIndexStats(): Promise<{ total: number; last_indexed: st
 export async function getFtsStats(): Promise<{ files_count: number; content_count: number; fts_count: number }> {
   return invoke<{ files_count: number; content_count: number; fts_count: number }>('get_fts_stats');
 }
+
+/**
+ * Update document metadata for a given file path.
+ */
+export async function updateDocumentMetadata(
+  path: string,
+  metadata: {
+    religion?: string | null;
+    book?: string | null;
+    chapter?: string | null;
+    title?: string | null;
+    author?: string | null;
+    language?: string | null;
+  }
+): Promise<void> {
+  return invoke<void>('update_document_metadata', { path, ...metadata });
+}
+
+/**
+ * Get metadata for a document by path.
+ */
+export async function getDocumentMetadata(path: string): Promise<{
+  religion: string | null;
+  book: string | null;
+  chapter: string | null;
+  title: string | null;
+  author: string | null;
+  language: string | null;
+}> {
+  return invoke('get_document_metadata', { path });
+}

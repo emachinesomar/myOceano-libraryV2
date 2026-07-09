@@ -74,6 +74,81 @@ impl Database {
         Ok(())
     }
 
+    /// Update document metadata by file path.
+    pub fn update_metadata(
+        &self,
+        file_path: &str,
+        religion: Option<&str>,
+        book: Option<&str>,
+        chapter: Option<&str>,
+        title: Option<&str>,
+        author: Option<&str>,
+        language: Option<&str>,
+    ) -> SqlResult<()> {
+        let conn = self.conn.lock().unwrap();
+
+        // Get file_id from path
+        let file_id: i64 = conn.query_row(
+            "SELECT id FROM files WHERE path = ?1",
+            rusqlite::params![file_path],
+            |row| row.get(0),
+        )?;
+
+        // Check if metadata exists
+        let exists: bool = conn.query_row(
+            "SELECT COUNT(1) FROM document_metadata WHERE file_id = ?1",
+            rusqlite::params![file_id],
+            |row| row.get(0),
+        )?;
+
+        if exists {
+            conn.execute(
+                "UPDATE document_metadata SET religion=?2, book=?3, chapter=?4, title=?5, author=?6, language=?7 WHERE file_id=?1",
+                rusqlite::params![file_id, religion, book, chapter, title, author, language],
+            )?;
+        } else {
+            conn.execute(
+                "INSERT INTO document_metadata (file_id, religion, book, chapter, title, author, language) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                rusqlite::params![file_id, religion, book, chapter, title, author, language],
+            )?;
+        }
+
+        // Also update FTS content table
+        conn.execute(
+            "UPDATE documents_content SET religion=?2, book=?3, title=?4, author=?5 WHERE path=?1",
+            rusqlite::params![file_path, religion, book, title, author],
+        )?;
+
+        Ok(())
+    }
+
+    /// Get metadata for a file path.
+    pub fn get_metadata(&self, file_path: &str) -> SqlResult<Option<DocumentMetadataRow>> {
+        let conn = self.conn.lock().unwrap();
+        let result = conn.query_row(
+            "SELECT dm.religion, dm.book, dm.chapter, dm.title, dm.author, dm.language
+             FROM document_metadata dm
+             JOIN files f ON f.id = dm.file_id
+             WHERE f.path = ?1",
+            rusqlite::params![file_path],
+            |row| {
+                Ok(DocumentMetadataRow {
+                    religion: row.get(0)?,
+                    book: row.get(1)?,
+                    chapter: row.get(2)?,
+                    title: row.get(3)?,
+                    author: row.get(4)?,
+                    language: row.get(5)?,
+                })
+            },
+        );
+        match result {
+            Ok(row) => Ok(Some(row)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
     /// Insert into FTS5 content table and the virtual table.
     pub fn insert_fts(
         &self,
@@ -345,6 +420,16 @@ pub struct FtsStats {
     pub files_count: i64,
     pub content_count: i64,
     pub fts_count: i64,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct DocumentMetadataRow {
+    pub religion: Option<String>,
+    pub book: Option<String>,
+    pub chapter: Option<String>,
+    pub title: Option<String>,
+    pub author: Option<String>,
+    pub language: Option<String>,
 }
 
 /// Extract the paragraph containing the search match from the full body.

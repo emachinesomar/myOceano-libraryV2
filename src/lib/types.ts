@@ -65,3 +65,13 @@ export interface IndexResult {
   errors: string[];
   duration_ms: number;
 }
+
+/** Document metadata row for editing */
+export interface DocumentMetadataRow {
+  religion: string | null;
+  book: string | null;
+  chapter: string | null;
+  title: string | null;
+  author: string | null;
+  language: string | null;
+}
