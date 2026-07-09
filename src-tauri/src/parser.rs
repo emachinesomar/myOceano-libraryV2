@@ -437,6 +437,16 @@ tags:
                         );
                     }
 
+                    // Cristo file must be classified as "Libros"
+                    if filename.contains("Cristo_y_Bahaullah") {
+                        assert_eq!(
+                            meta.book.as_deref(),
+                            Some("Libros"),
+                            "Cristo file should be book=Libros, got {:?}",
+                            meta.book
+                        );
+                    }
+
                     if meta.religion.is_none() {
                         unclassified.push(filename.to_string());
                     }

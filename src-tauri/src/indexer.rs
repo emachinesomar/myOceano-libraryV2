@@ -103,14 +103,13 @@ pub fn index_files(
         let ext_lower = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
         let (body, metadata) = if ext_lower == "pdf" {
             // PDF: extract text, infer metadata from path
+            let inferred = infer_metadata_from_path(path);
             match extract_pdf_text(path) {
-                Ok(text) => {
-                    let inferred = infer_metadata_from_path(path);
-                    (text, inferred)
-                }
+                Ok(text) => (text, inferred),
                 Err(e) => {
-                    errors.push(format!("PDF extract error {}: {}", path.display(), e));
-                    continue;
+                    // Index with empty body so file still appears in tree
+                    errors.push(format!("PDF extract error (indexed without text): {}: {}", path.display(), e));
+                    (String::new(), inferred)
                 }
             }
         } else {
