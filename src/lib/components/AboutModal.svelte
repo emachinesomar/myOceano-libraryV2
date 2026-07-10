@@ -120,8 +120,8 @@
         </div>
       </section>
 
-      <!-- ── Bottom row: Stack + Philosophy + Reqs ── -->
-      <div class="grid grid-cols-3 gap-4 mb-4">
+      <!-- ── Bottom row: Stack + Philosophy ── -->
+      <div class="grid grid-cols-2 gap-4 mb-4">
         <!-- Stack -->
         <section>
           <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
@@ -152,21 +152,6 @@
             {/each}
           </ul>
         </section>
-
-        <!-- Requirements -->
-        <section>
-          <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
-            Requisitos
-          </h3>
-          <div class="rounded-lg bg-muted/50 p-2.5 space-y-1.5">
-            <p class="text-xs text-muted-foreground leading-relaxed">
-              <span class="font-medium text-card-foreground">PyMuPDF</span> solo para PDFs corruptos que
-              <code class="rounded bg-background px-1 py-0.5 text-[10px] font-mono">pdf-extract</code>
-              no puede leer.
-            </p>
-            <code class="block rounded bg-background px-2 py-1 text-[11px] font-mono text-card-foreground">pip install PyMuPDF</code>
-          </div>
-        </section>
       </div>
 
       <!-- ── Footer ── -->
@@ -182,7 +167,10 @@
           </svg>
           GitHub
         </a>
-        <span class="text-xs text-muted-foreground">&copy; {app.year} {app.author}</span>
+        <span class="inline-flex items-center gap-1.5 text-sm font-semibold text-card-foreground">
+          Hecho con <span class="text-red-500">❤️</span> por
+          <span class="bg-primary/10 text-primary px-2 py-0.5 rounded-md font-bold tracking-wide">{app.author}</span>
+        </span>
       </div>
     </div>
   </div>
