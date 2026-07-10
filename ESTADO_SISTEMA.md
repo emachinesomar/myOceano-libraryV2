@@ -1,7 +1,7 @@
 # Estado del Sistema — Ocean Library v2
 
 > Descripción técnica de lo que el sistema hace actualmente.
-> Versión: 0.1.0 | Última actualización: 2026-07-09
+> Versión: 0.1.0 | Última actualización: 2026-07-10
 
 ---
 
@@ -13,7 +13,8 @@
 | Runtime | Tauri | v2 |
 | Base de datos | SQLite + FTS5 | rusqlite 0.31 |
 | Tokenizador FTS | unicode61 | remove_diacritics=2 |
-| Extracción PDF | pdf-extract | 0.7 |
+| Extracción PDF (primario) | pdf-extract | 0.7 |
+| Extracción PDF (fallback) | PyMuPDF via Python | fitz 1.28 |
 | Frontmatter | gray_matter | 0.2 |
 | Walkdir | walkdir | 2 |
 | Async runtime | tokio | 1.x |
@@ -37,10 +38,12 @@ myOceano-library/
 ├── src-tauri/
 │   ├── src/
 │   │   ├── main.rs          # Entry point
-│   │   ├── lib.rs           # 11 comandos Tauri + tree builder
+│   │   ├── lib.rs           # 12 comandos Tauri + tree builder
 │   │   ├── db.rs            # SQLite CRUD, FTS5, búsquedas
 │   │   ├── parser.rs        # Inferencia de metadata (4 patrones)
-│   │   └── indexer.rs       # Escaneo + indexación de archivos
+│   │   └── indexer.rs       # Escaneo + indexación + fallback PyMuPDF
+│   ├── scripts/
+│   │   └── pymupdf_extract.py # Fallback Python para PDFs corruptos
 │   ├── migrations/
 │   │   └── 001_init.sql     # Schema FTS5
 │   └── capabilities/
@@ -53,32 +56,34 @@ myOceano-library/
 │   │   │   ├── TreeItem.svelte         # Nodo recursivo del árbol
 │   │   │   ├── DocumentViewer.svelte   # Lector de documentos
 │   │   │   ├── SearchCommand.svelte    # Búsqueda manual
-│   │   │   ├── EditMetadataModal.svelte # Editor de metadata
+│   │   │   ├── EditMetadataModal.svelte # Editor de metadata (3 modos)
 │   │   │   └── Toast.svelte            # Notificaciones
 │   │   ├── stores/
 │   │   │   ├── document.ts             # Estado del documento seleccionado
 │   │   │   └── toast.ts               # Estado de notificaciones
-│   │   ├── tauri.ts                    # Wrappers para comandos Tauri
-│   │   ├── types.ts                    # Tipos TypeScript
+│   │   ├── tauri.ts                    # Wrappers para 12 comandos Tauri
+│   │   ├── types.ts                    # Tipos TypeScript (TreeNode con religion)
 │   │   └── utils.ts                    # Helper cn()
 │   └── routes/
 │       ├── +layout.svelte              # Layout principal (sidebar + topbar)
 │       └── +page.svelte                # Página principal
+├── ESTADO_SISTEMA.md
+├── SOLICITUDES_USUARIO.md
 └── samples/                            # Documentos de prueba
 ```
 
 ---
 
-## 🔧 Comandos Tauri disponibles
+## 🔧 Comandos Tauri disponibles (12)
 
 | Comando | Descripción | Parámetros |
 |---------|-------------|------------|
-| `index_directory` | Indexa una carpeta completa | `path: String` |
+| `index_directory` | Indexa una carpeta completa (con fallback PyMuPDF) | `path: String` |
 | `search_documents` | Búsqueda FTS5 + LIKE en paths | `query: String, limit: i64` |
-| `get_document_tree` | Obtiene árbol jerárquico | — |
-| `read_document` | Lee el contenido completo | `path: String` |
-| `clear_index` | Borra todo y recrea tablas | — |
-| `delete_document` | Elimina un documento | `path: String` |
+| `get_document_tree` | Obtiene árbol jerárquico con `religion` en book nodes | — |
+| `read_document` | Lee el contenido completo de un documento | `path: String` |
+| `clear_index` | Borra todo (DROP + CREATE para FTS5 externo) | — |
+| `delete_document` | Elimina un documento (FTS → content → metadata → files) | `path: String` |
 | `get_index_stats` | Estadísticas del índice | — |
 | `get_fts_stats` | Stats del índice FTS5 | — |
 | `update_document_metadata` | Actualiza metadata individual | `path, religion, book, chapter, title, author, language` |
@@ -187,23 +192,32 @@ Religión
 │   └── 051227 Mensaje a conferencia consejeros CAST.pdf
 └── Libros
     ├── LO-George-Townshend_Cristo_y_Bahaullah.pdf
+    ├── LB-El_Kitab-i-Aqdas.pdf
     └── [otros documentos Baha'íes sueltos]
 ```
+
+### Tipos de nodo
+| Tipo | Icono | Descripción |
+|------|-------|-------------|
+| religion | 🌍 | Primer nivel (Fe bahá'í, Islam, etc.) |
+| book | 📘 | Segundo nivel (Ridván, CUJ, Libros, etc.) |
+| chapter | 📁 | Solo Instituto Ruhí — agrupa por Libro X |
+| document | 📄 | Hoja individual del PDF |
 
 ---
 
 ## 🎨 Interfaz de usuario
 
 ### Layout (sidebar-03)
-- **Sidebar izquierda:** Árbol de navegación con conteo de documentos
+- **Sidebar izquierda:** Árbol de navegación con conteo de documentos y botón de borrar DB
 - **Top bar:** Buscador con Ctrl+K, toggle de modo oscuro
 - **Área principal:** Lector de documentos con Markdown renderizado
 
 ### Componentes
-- **TreeItem:** Nodo recursivo con expand/collapse, hover para editar/eliminar
-- **EditMetadataModal:** Modal con 3 modos (religión/libro/documento), presets por religión
-- **SearchCommand:** Búsqueda manual con botón o Enter, muestra snippet + párrafo
-- **DocumentViewer:** Renderiza Markdown con `marked`, scroll-to-top, snippet preview
+- **TreeItem:** Nodo recursivo con expand/collapse, iconos por tipo, hover para editar/eliminar
+- **EditMetadataModal:** Modal con 3 modos (religión→bulk rename, libro→bulk rename, documento→full form)
+- **SearchCommand:** Búsqueda manual con botón o Enter, muestra snippet + párrafo via UNION query
+- **DocumentViewer:** Renderiza Markdown con `marked`, scroll-to-top
 - **Toast:** Notificaciones emergentes de éxito/error
 
 ### Atajos de teclado
@@ -212,20 +226,25 @@ Religión
 
 ---
 
-## 🧪 Tests (18 total)
+## 🧪 Tests (18 total — todos pasando)
 
-### Rust (17 tests)
-- 7× Parser: inferencia de metadata (Ridván, CUJ, Ruhí, carpetas, todos los samples)
-- 7× DB: sanitización de queries FTS5
-- 1× DB: insert + search
-- 1× DB: extract_paragraph
-- 1× Parser: todos los archivos de samples
+### Rust (18 tests)
+| Módulo | Tests | Lo que cubren |
+|--------|-------|---------------|
+| Parser | 7 | Inferencia: Ridván, CUJ, Ruhí, carpetas, keywords |
+| Parser | 1 | `test_infer_all_sample_files` — todos los PDFs de samples |
+| Parser | 1 | `test_infer_baha_book_libros` — 40+ keywords Baha'íes |
+| DB | 1 | Insert + search + tree |
+| DB | 1 | FTS5 sanity check |
+| DB | 1 | extract_paragraph |
+| DB | 6 | sanitize_fts_query (varios casos) |
 
 ### Cobertura
-- ✅ Inferencia de metadata para 42 archivos de prueba
-- ✅ Búsqueda FTS5 con sanitización
-- ✅ CRUD completo de documentos
-- ✅ Árbol jerárquico con 3 niveles
+- ✅ Inferencia de metadata para 45+ archivos de prueba
+- ✅ Búsqueda FTS5 con sanitización (comillas, AND/OR/NOT)
+- ✅ CRUD completo de documentos + bulk update
+- ✅ Árbol jerárquico con 4 tipos de nodo
+- ✅ PDFs corruptos → fallback PyMuPDF
 
 ---
 
@@ -233,13 +252,32 @@ Religión
 
 | Categoría | Cantidad | Ejemplo |
 |-----------|----------|---------|
-| Instituto Ruhí | 31 archivos | Libro 1 a Libro 14 |
+| Instituto Ruhí | 31 archivos | Libro 1 a Libro 14 (múltiples unidades) |
 | Ridván | 5 archivos | 2022-2026 |
 | CUJ | 5 archivos | 2010-2026 |
 | Mensaje a conferencia | 1 archivo | 2005 |
-| Libros (otros) | 1 archivo | Cristo y Baha'u'lláh |
+| Libros (otros) | 2 archivos | Cristo y Bahá'u'lláh, Kitáb-i-Aqdas |
 | Sin clasificar | 2 archivos | Fechas ambiguas |
-| **Total** | **45 archivos** | |
+| **Total** | **~46 archivos** | |
+
+---
+
+## 📝 Notas técnicas importantes
+
+### FTS5 externo no soporta DELETE
+- `DELETE FROM documents_fts` no funciona con tablas de contenido externo
+- `clear_all()` usa DROP TABLE + recreación del schema completo
+- `delete_document()` elimina en orden: FTS rebuild → content → metadata → files
+
+### Fallback PyMuPDF
+- `pdf_extract` falla en PDFs con tabla cross-reference corrupta
+- El indexer intenta `pdf-extract` primero, si falla llama a `scripts/pymupdf_extract.py` via Python
+- Si Python no está disponible o PyMuPDF no está instalado, indexa con body vacío
+- Requiere: `pip install PyMuPDF`
+
+### `confirm()` en Tauri
+- `window.confirm()` SÍ funciona en Tauri webview (contrario a lo que se documentó antes)
+- Se usa para confirmar eliminación de documentos
 
 ---
 
@@ -248,6 +286,7 @@ Religión
 ```bash
 # Instalar dependencias
 pnpm install
+pip install PyMuPDF   # Para fallback de PDFs corruptos
 
 # Desarrollo
 pnpm tauri dev

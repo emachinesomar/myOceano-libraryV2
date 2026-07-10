@@ -1,7 +1,7 @@
 # Solicitudes del Usuario — Ocean Library v2
 
 > Documento de peticiones y funcionalidades pendientes para futuras versiones.
-> Última actualización: 2026-07-09
+> Última actualización: 2026-07-10
 
 ---
 
@@ -14,6 +14,8 @@
 - [ ] Autocompletado de términos de búsqueda
 - [ ] Historial de búsquedas recientes
 - [ ] Exportar resultados de búsqueda
+- [ ] **Highlight de matches en el documento** — al abrir un doc desde search, scrollear al párrafo y resaltar todas las ocurrencias de la query
+- [ ] **Toolbar de búsqueda inline** — Ctrl+F dentro del visor con navegación entre resultados
 
 ### 📖 Navegación del árbol
 - [ ] Colapsar/expandir todos los nodos de una vez
@@ -30,12 +32,24 @@
 - [ ] Deshacer último cambio de metadata
 
 ### 📄 Visualización de documentos
+- [ ] **Renderer de PDF completo** — integrar PDF.js para ver el PDF original con imágenes, tablas, formato
+- [ ] **Renderizado de páginas como imágenes** — usar PyMuPDF para convertir páginas a PNG y mostrarlas inline
+- [ ] **Zoom** en el visor de documentos
+- [ ] **Selección de texto + copia** en el PDF renderizado
 - [ ] Modo lectura con fuente personalizable (tamaño, familia)
 - [ ] Modo oscuro/claro para el lector
 - [ ] Navegación por capítulos dentro del documento
-- [ ] Notas/bordes del usuario sobre el texto
 - [ ] Compartir fragmento de texto
 - [ ] Imprimir documento
+
+### 🖍️ Anotaciones y marcado (nuevo)
+- [ ] **Highlight de texto** — seleccionar y resaltar pasajes con color
+- [ ] **Notas al margen** — agregar notas personales a páginas/paragraphos específicos
+- [ ] **Subrayado y tachado** — herramientas de marcado de texto
+- [ ] **Dibujo libre** — rayar/dibujar sobre el PDF (como en visores de PDF con lápiz)
+- [ ] **Persistencia de anotaciones** — guardar en SQLite (página, tipo, coordenadas, contenido, color)
+- [ ] **Toggle de anotaciones** — mostrar/ocultar todas las anotaciones
+- [ ] **Exportar PDF con anotaciones** — PDF anotado para compartir
 
 ### 📁 Gestión de documentos
 - [ ] Agregar documentos individuales (no solo carpetas)
@@ -83,9 +97,12 @@
 ---
 
 ## 🐛 Bugs conocidos
-- [ ] `window.confirm()` bloqueado en Tauri webview — usar modales custom
-- [ ] Los archivos con solo fecha en el nombre ("4 de enero de 2026") no se clasifican automáticamente
+- [ ] Los archivos con solo fecha en el nombre ("4 de enero de 2026", "4 ene 2022") no se clasifican automáticamente
 - [ ] DB corrupta si se interrumpe la indexación a mitad
+- [ ] PDFs con cross-reference table corrupta requieren `pip install PyMuPDF` para indexarse
+
+### Fixed
+- ~~`window.confirm()` bloqueado en Tauri webview~~ — ✅ **Funciona bien en Tauri webview**, se usa para confirmar eliminación
 
 ---
 
@@ -96,3 +113,11 @@
 - Modo offline-first con sincronización posterior
 - IA para resúmenes automáticos de documentos
 - Detección de duplicados por contenido (no solo nombre)
+
+---
+
+## 🎯 Prioridades discutidas (sesión 2026-07-10)
+
+1. **Short-term:** Highlight de matches de búsqueda en el documento (scroll + `<mark>`)
+2. **Medium-term:** Visor de PDF completo (PDF.js o render vía PyMuPDF)
+3. **Long-term:** Anotaciones (highlights, notas, dibujo) sobre el PDF
