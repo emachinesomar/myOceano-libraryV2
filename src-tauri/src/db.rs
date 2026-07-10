@@ -467,6 +467,19 @@ impl Database {
         Ok(())
     }
 
+    /// Get all indexed file paths with their mtimes (for sync).
+    pub fn get_all_indexed_paths(&self) -> SqlResult<Vec<(String, String)>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT path, mtime FROM files")?;
+        let rows = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+        let mut result = Vec::new();
+        for row in rows {
+            result.push(row?);
+        }
+        Ok(result)
+    }
+
     /// Delete a single document by path from all tables.
     pub fn delete_document(&self, path: &str) -> SqlResult<()> {
         let conn = self.conn.lock().unwrap();

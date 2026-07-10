@@ -3,7 +3,7 @@ mod indexer;
 mod parser;
 
 use db::Database;
-use indexer::full_index;
+use indexer::{full_index, sync_directory};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::Emitter;
@@ -51,6 +51,46 @@ async fn index_directory(
     Ok(IndexResult {
         total_files: result.total_files,
         indexed: result.indexed,
+        skipped: result.skipped,
+        errors: result.errors,
+        duration_ms: result.duration_ms,
+    })
+}
+
+/// Sync index with filesystem: index new/changed files, remove deleted ones.
+/// Emits `sync-progress` events during processing.
+#[tauri::command]
+async fn sync_directory_command(
+    path: String,
+    app: tauri::AppHandle,
+) -> Result<SyncResult, String> {
+    let state = app.state::<Arc<AppState>>();
+    let db = Arc::clone(&state.db);
+    let root = PathBuf::from(&path);
+
+    if !root.exists() {
+        return Err(format!("Directory not found: {}", path));
+    }
+
+    let result = tokio::task::spawn_blocking(move || {
+        sync_directory(&db, &root, Some(&|current, total, filename| {
+            let _ = app.emit(
+                "sync-progress",
+                IndexProgressPayload {
+                    current,
+                    total,
+                    filename: filename.to_string(),
+                },
+            );
+        }))
+    })
+    .await
+    .map_err(|e| format!("Sync task failed: {}", e))?;
+
+    Ok(SyncResult {
+        total_on_disk: result.total_on_disk,
+        indexed: result.indexed,
+        removed: result.removed,
         skipped: result.skipped,
         errors: result.errors,
         duration_ms: result.duration_ms,
@@ -285,6 +325,16 @@ struct IndexStats {
     last_indexed: Option<String>,
 }
 
+#[derive(Clone, serde::Serialize)]
+struct SyncResult {
+    total_on_disk: usize,
+    indexed: usize,
+    removed: usize,
+    skipped: usize,
+    errors: Vec<String>,
+    duration_ms: u64,
+}
+
 // ──────────────────────────── Tree Builder ────────────────────────────
 
 fn build_tree(entries: Vec<db::TreeEntry>) -> Vec<TreeNodeJson> {
@@ -418,6 +468,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             index_directory,
+            sync_directory_command,
             search_documents,
             get_document_tree,
             read_document,

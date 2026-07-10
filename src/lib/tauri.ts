@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { SearchResponse, TreeNode, IndexResult } from './types';
+import type { SearchResponse, TreeNode, IndexResult, SyncResult } from './types';
 
 /**
  * Scan and index a directory of Markdown files.
@@ -7,6 +7,14 @@ import type { SearchResponse, TreeNode, IndexResult } from './types';
  */
 export async function indexDirectory(path: string): Promise<IndexResult> {
   return invoke<IndexResult>('index_directory', { path });
+}
+
+/**
+ * Sync index with filesystem: index new/changed files, remove deleted ones.
+ * Faster than a full re-index. Emits `sync-progress` events.
+ */
+export async function syncDirectory(path: string): Promise<SyncResult> {
+  return invoke<SyncResult>('sync_directory_command', { path });
 }
 
 /**

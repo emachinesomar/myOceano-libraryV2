@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import type { TreeNode } from '$lib/types';
-  import { getDocumentTree, indexDirectory, clearIndex, getFtsStats } from '$lib/tauri';
+  import { getDocumentTree, indexDirectory, syncDirectory, clearIndex, getFtsStats } from '$lib/tauri';
   import { toasts } from '$lib/stores/toast';
   import DocumentTree from './DocumentTree.svelte';
 
@@ -10,8 +10,15 @@
   let tree = $state<TreeNode[]>([]);
   let loading = $state(false);
   let indexing = $state(false);
+  let syncing = $state(false);
   let indexProgress = $state({ current: 0, total: 0, filename: '' });
+  let syncProgress = $state({ current: 0, total: 0, filename: '' });
   let ftsStats = $state<{ files_count: number; content_count: number; fts_count: number } | null>(null);
+
+  // Last indexed path — stored in localStorage so Sync button can re-use without dialog
+  let lastIndexedPath = $state<string | null>(() => {
+    try { return localStorage.getItem('lastIndexedPath'); } catch { return null; }
+  });
 
   onMount(async () => {
     await loadTree();
@@ -69,6 +76,10 @@
       const result = await indexDirectory(path);
       unlisten();
 
+      // Save path for future sync
+      lastIndexedPath = path;
+      try { localStorage.setItem('lastIndexedPath', path); } catch {}
+
       if (result.errors.length > 0) {
         toasts.error(`Indexados ${result.indexed} archivos, ${result.errors.length} errores`);
       } else {
@@ -95,6 +106,62 @@
       console.error('Failed to clear index:', e);
       toasts.error('Error al limpiar el índice');
     }
+  }
+
+  async function handleSync() {
+    let path = lastIndexedPath;
+    if (!path) {
+      // No previous path — ask user to pick a folder
+      const { open: openDialog } = await import('@tauri-apps/plugin-dialog');
+      const selected = await openDialog({ directory: true, multiple: false });
+      if (!selected) return;
+      if (typeof selected === 'string') {
+        path = selected;
+      } else if (Array.isArray(selected)) {
+        path = selected[0];
+      } else {
+        path = String(selected);
+      }
+    }
+
+    try {
+      syncing = true;
+      syncProgress = { current: 0, total: 0, filename: '' };
+
+      const { listen } = await import('@tauri-apps/api/event');
+      const unlisten = await listen<{ current: number; total: number; filename: string }>(
+        'sync-progress',
+        (event) => {
+          syncProgress = event.payload;
+        }
+      );
+
+      const result = await syncDirectory(path);
+      unlisten();
+
+      // Save path for future sync
+      lastIndexedPath = path;
+      try { localStorage.setItem('lastIndexedPath', path); } catch {}
+
+      const parts: string[] = [];
+      if (result.indexed > 0) parts.push(`${result.indexed} indexados`);
+      if (result.removed > 0) parts.push(`${result.removed} eliminados`);
+      if (result.skipped > 0) parts.push(`${result.skipped} sin cambios`);
+      const msg = parts.length > 0 ? parts.join(', ') : 'Sin cambios';
+      if (result.errors.length > 0) {
+        toasts.error(`Sync: ${msg}, ${result.errors.length} errores`);
+      } else {
+        toasts.success(`Sync: ${msg} (${result.duration_ms}ms)`);
+      }
+      console.log(`Sync: ${msg} in ${result.duration_ms}ms`);
+      await loadTree();
+      await loadFtsStats();
+    } catch (e) {
+      console.error('Sync failed:', e);
+      toasts.error(`Error al sincronizar: ${String(e)}`);
+    }
+
+    syncing = false;
   }
 </script>
 
@@ -137,6 +204,27 @@
           Indexar carpeta
         {/if}
       </button>
+
+      {#if tree.length > 0 || lastIndexedPath}
+        <button
+          class="w-full mt-2 inline-flex items-center justify-center gap-2 rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
+          onclick={handleSync}
+          disabled={syncing || indexing}
+        >
+          {#if syncing}
+            <svg class="h-3.5 w-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            Sincronizando {syncProgress.current}/{syncProgress.total}...
+          {:else}
+            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Sincronizar
+          {/if}
+        </button>
+      {/if}
 
       {#if tree.length > 0}
         <button
