@@ -4,12 +4,14 @@
   import '../app.css';
   import AppSidebar from '$lib/components/AppSidebar.svelte';
   import SearchCommand from '$lib/components/SearchCommand.svelte';
+  import AboutModal from '$lib/components/AboutModal.svelte';
   import Toast from '$lib/components/Toast.svelte';
 
   let { children }: { children: Snippet } = $props();
 
   let sidebarOpen = $state(true);
   let commandOpen = $state(false);
+  let aboutOpen = $state(false);
   let isDark = $state(true);
 
   onMount(() => {
@@ -87,6 +89,17 @@
         {/if}
       </button>
 
+      <!-- About button -->
+      <button
+        class="inline-flex items-center justify-center rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+        onclick={() => (aboutOpen = true)}
+        aria-label="Acerca de"
+      >
+        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      </button>
+
       <span class="text-xs text-muted-foreground font-medium tracking-wide uppercase">
         Ocean Library v2
       </span>
@@ -101,6 +114,9 @@
 
 <!-- Global search command palette -->
 <SearchCommand bind:open={commandOpen} />
+
+<!-- About modal -->
+<AboutModal bind:open={aboutOpen} />
 
 <!-- Toast notifications -->
 <Toast />

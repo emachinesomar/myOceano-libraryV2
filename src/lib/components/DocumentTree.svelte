@@ -2,7 +2,7 @@
   import type { TreeNode } from '$lib/types';
   import TreeItem from './TreeItem.svelte';
 
-  let { nodes }: { nodes: TreeNode[] } = $props();
+  let { nodes, onMetadataSaved = () => {} }: { nodes: TreeNode[]; onMetadataSaved?: () => void } = $props();
 </script>
 
 <div class="space-y-0.5">
@@ -12,5 +12,5 @@
 </div>
 
 {#snippet treeItem(node: TreeNode)}
-  <TreeItem {node} />
+  <TreeItem {node} {onMetadataSaved} />
 {/snippet}

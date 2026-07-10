@@ -40,6 +40,7 @@ export interface TreeNode {
   count: number;
   children: TreeNode[];
   path?: string;
+  religion?: string; // Inherited religion name for book nodes
 }
 
 /** Search response with pagination */
@@ -64,4 +65,24 @@ export interface IndexResult {
   skipped: number;
   errors: string[];
   duration_ms: number;
+}
+
+/** Sync result summary */
+export interface SyncResult {
+  total_on_disk: number;
+  indexed: number;
+  removed: number;
+  skipped: number;
+  errors: string[];
+  duration_ms: number;
+}
+
+/** Document metadata row for editing */
+export interface DocumentMetadataRow {
+  religion: string | null;
+  book: string | null;
+  chapter: string | null;
+  title: string | null;
+  author: string | null;
+  language: string | null;
 }

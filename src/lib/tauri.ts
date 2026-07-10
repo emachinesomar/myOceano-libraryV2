@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { SearchResponse, TreeNode, IndexResult } from './types';
+import type { SearchResponse, TreeNode, IndexResult, SyncResult } from './types';
 
 /**
  * Scan and index a directory of Markdown files.
@@ -7,6 +7,14 @@ import type { SearchResponse, TreeNode, IndexResult } from './types';
  */
 export async function indexDirectory(path: string): Promise<IndexResult> {
   return invoke<IndexResult>('index_directory', { path });
+}
+
+/**
+ * Sync index with filesystem: index new/changed files, remove deleted ones.
+ * Faster than a full re-index. Emits `sync-progress` events.
+ */
+export async function syncDirectory(path: string): Promise<SyncResult> {
+  return invoke<SyncResult>('sync_directory_command', { path });
 }
 
 /**
@@ -38,6 +46,13 @@ export async function clearIndex(): Promise<void> {
 }
 
 /**
+ * Delete a single document by path.
+ */
+export async function deleteDocument(path: string): Promise<void> {
+  return invoke<void>('delete_document', { path });
+}
+
+/**
  * Get the total number of indexed documents.
  */
 export async function getIndexStats(): Promise<{ total: number; last_indexed: string | null }> {
@@ -49,4 +64,49 @@ export async function getIndexStats(): Promise<{ total: number; last_indexed: st
  */
 export async function getFtsStats(): Promise<{ files_count: number; content_count: number; fts_count: number }> {
   return invoke<{ files_count: number; content_count: number; fts_count: number }>('get_fts_stats');
+}
+
+/**
+ * Update document metadata for a given file path.
+ */
+export async function updateDocumentMetadata(
+  path: string,
+  metadata: {
+    religion?: string | null;
+    book?: string | null;
+    chapter?: string | null;
+    title?: string | null;
+    author?: string | null;
+    language?: string | null;
+  }
+): Promise<void> {
+  return invoke<void>('update_document_metadata', { path, ...metadata });
+}
+
+/**
+ * Get metadata for a document by path.
+ */
+export async function getDocumentMetadata(path: string): Promise<{
+  religion: string | null;
+  book: string | null;
+  chapter: string | null;
+  title: string | null;
+  author: string | null;
+  language: string | null;
+}> {
+  return invoke('get_document_metadata', { path });
+}
+
+/**
+ * Bulk update religion for all documents with a given religion.
+ */
+export async function updateReligionBulk(oldReligion: string, newReligion: string): Promise<number> {
+  return invoke<number>('update_religion_bulk', { oldReligion, newReligion });
+}
+
+/**
+ * Bulk update book for all documents with a given religion + book.
+ */
+export async function updateBookBulk(religion: string, oldBook: string, newBook: string): Promise<number> {
+  return invoke<number>('update_book_bulk', { religion, oldBook, newBook });
 }
